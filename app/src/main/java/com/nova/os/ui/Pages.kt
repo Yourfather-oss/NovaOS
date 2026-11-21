@@ -116,7 +116,7 @@ private fun PillButton(label: String, modifier: Modifier = Modifier, onClick: ()
     ) { Text(label, color = TextPrimary, fontSize = 14.sp) }
 }
 
-private fun pageModifier(): Modifier = Modifier
+internal fun pageModifier(): Modifier = Modifier
     .fillMaxSize()
     .background(Brush.verticalGradient(listOf(Obsidian.copy(alpha = 0.90f), Obsidian.copy(alpha = 0.97f))))
 

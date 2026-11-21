@@ -9,7 +9,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -23,14 +25,8 @@ import kotlin.random.Random
 
 /** Animated living wallpaper: drifting light fields over deep space. */
 @Composable
-fun NovaBackdrop(style: String) {
-    val transition = rememberInfiniteTransition(label = "backdrop")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(30000, easing = LinearEasing), RepeatMode.Restart),
-        label = "phase"
-    )
+fun NovaBackdrop(style: String, animate: Boolean = true) {
+    val phase: State<Float> = if (animate) animatedPhase() else remember { mutableStateOf(0.25f) }
     val stars = remember {
         val r = Random(7)
         List(80) { Triple(r.nextFloat(), r.nextFloat(), 0.5f + r.nextFloat() * 1.3f) }
@@ -38,7 +34,7 @@ fun NovaBackdrop(style: String) {
 
     Canvas(Modifier.fillMaxSize()) {
         drawRect(Brush.verticalGradient(listOf(DeepSpace, Obsidian)))
-        val a = (phase * 2.0 * PI).toFloat()
+        val a = (phase.value * 2.0 * PI).toFloat()
         val w = size.width
         val h = size.height
 
@@ -74,4 +70,15 @@ fun NovaBackdrop(style: String) {
             }
         }
     }
+}
+
+@Composable
+private fun animatedPhase(): State<Float> {
+    val transition = rememberInfiniteTransition(label = "backdrop")
+    return transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(30000, easing = LinearEasing), RepeatMode.Restart),
+        label = "phase"
+    )
 }

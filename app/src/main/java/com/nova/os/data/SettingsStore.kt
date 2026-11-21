@@ -3,6 +3,7 @@ package com.nova.os.data
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -17,7 +18,22 @@ data class NovaPrefs(
     val wallpaper: String = "aurora",
     val iconShape: String = "squircle",
     val launchLog: List<Pair<String, Long>> = emptyList(),
-    val note: String = ""
+    val note: String = "",
+    val surface: String = "glass",
+    val iconSize: Int = 54,
+    val showLabels: Boolean = true,
+    val clockWeight: String = "thin",
+    val clockFont: String = "default",
+    val clockSize: String = "m",
+    val animSpeed: String = "normal",
+    val liveWallpaper: Boolean = true,
+    val gestureUp: String = "drawer",
+    val gestureDown: String = "control",
+    val gestureLeft: String = "dashboard",
+    val gestureRight: String = "widgets",
+    val gestureLong: String = "studio",
+    val gestureDouble: String = "none",
+    val hidden: List<String> = emptyList()
 )
 
 class SettingsStore(private val context: Context) {
@@ -28,6 +44,14 @@ class SettingsStore(private val context: Context) {
     private val iconShapeKey = stringPreferencesKey("icon_shape")
     private val logKey = stringPreferencesKey("launch_log")
     private val noteKey = stringPreferencesKey("note")
+    private val surfaceKey = stringPreferencesKey("surface")
+    private val iconSizeKey = intPreferencesKey("icon_size")
+    private val showLabelsKey = booleanPreferencesKey("show_labels")
+    private val clockWeightKey = stringPreferencesKey("clock_weight")
+    private val clockFontKey = stringPreferencesKey("clock_font")
+    private val clockSizeKey = stringPreferencesKey("clock_size")
+    private val animSpeedKey = stringPreferencesKey("anim_speed")
+    private val liveWallpaperKey = booleanPreferencesKey("live_wallpaper")
 
     val flow: Flow<NovaPrefs> = context.novaStore.data.map { p ->
         NovaPrefs(
@@ -37,7 +61,22 @@ class SettingsStore(private val context: Context) {
             wallpaper = p[wallpaperKey] ?: "aurora",
             iconShape = p[iconShapeKey] ?: "squircle",
             launchLog = parseLog(p[logKey]),
-            note = p[noteKey] ?: ""
+            note = p[noteKey] ?: "",
+            surface = p[surfaceKey] ?: "glass",
+            iconSize = p[iconSizeKey] ?: 54,
+            showLabels = p[showLabelsKey] ?: true,
+            clockWeight = p[clockWeightKey] ?: "thin",
+            clockFont = p[clockFontKey] ?: "default",
+            clockSize = p[clockSizeKey] ?: "m",
+            animSpeed = p[animSpeedKey] ?: "normal",
+            liveWallpaper = p[liveWallpaperKey] ?: true,
+            gestureUp = p[stringPreferencesKey("g_up")] ?: "drawer",
+            gestureDown = p[stringPreferencesKey("g_down")] ?: "control",
+            gestureLeft = p[stringPreferencesKey("g_left")] ?: "dashboard",
+            gestureRight = p[stringPreferencesKey("g_right")] ?: "widgets",
+            gestureLong = p[stringPreferencesKey("g_long")] ?: "studio",
+            gestureDouble = p[stringPreferencesKey("g_double")] ?: "none",
+            hidden = (p[stringPreferencesKey("hidden")] ?: "").split(",").filter { it.isNotBlank() }
         )
     }
 
@@ -57,6 +96,16 @@ class SettingsStore(private val context: Context) {
     suspend fun setWallpaper(value: String) = context.novaStore.edit { it[wallpaperKey] = value }
     suspend fun setIconShape(value: String) = context.novaStore.edit { it[iconShapeKey] = value }
     suspend fun setNote(value: String) = context.novaStore.edit { it[noteKey] = value }
+    suspend fun setSurface(value: String) = context.novaStore.edit { it[surfaceKey] = value }
+    suspend fun setIconSize(value: Int) = context.novaStore.edit { it[iconSizeKey] = value }
+    suspend fun setShowLabels(value: Boolean) = context.novaStore.edit { it[showLabelsKey] = value }
+    suspend fun setClockWeight(value: String) = context.novaStore.edit { it[clockWeightKey] = value }
+    suspend fun setClockFont(value: String) = context.novaStore.edit { it[clockFontKey] = value }
+    suspend fun setClockSize(value: String) = context.novaStore.edit { it[clockSizeKey] = value }
+    suspend fun setAnimSpeed(value: String) = context.novaStore.edit { it[animSpeedKey] = value }
+    suspend fun setLiveWallpaper(value: Boolean) = context.novaStore.edit { it[liveWallpaperKey] = value }
+
+    suspend fun put(key: String, value: String) = context.novaStore.edit { it[stringPreferencesKey(key)] = value }
 
     suspend fun logLaunch(packageName: String) = context.novaStore.edit { p ->
         val current = p[logKey]?.lines()?.filter { it.isNotBlank() }.orEmpty()
