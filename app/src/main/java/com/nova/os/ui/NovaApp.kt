@@ -88,7 +88,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
-private enum class Screen { Splash, Home, Drawer, Settings }
+private enum class Screen { Splash, Home, Drawer, Settings, Control }
 
 @Composable
 fun NovaApp(homeSignal: Int) {
@@ -117,7 +117,7 @@ fun NovaApp(homeSignal: Int) {
     var screen by remember { mutableStateOf(Screen.Splash) }
     LaunchedEffect(Unit) { delay(1600); screen = Screen.Home }
     LaunchedEffect(homeSignal) { if (screen != Screen.Splash) screen = Screen.Home }
-    BackHandler(enabled = screen == Screen.Drawer || screen == Screen.Settings) { screen = Screen.Home }
+    BackHandler(enabled = screen == Screen.Drawer || screen == Screen.Settings || screen == Screen.Control) { screen = Screen.Home }
 
     val dockPackages = prefs.dock ?: defaultDock(apps)
     val dockApps = dockPackages.mapNotNull { pkg -> apps.firstOrNull { it.packageName == pkg } }
@@ -128,9 +128,14 @@ fun NovaApp(homeSignal: Int) {
         scope.launch { store.setDock(current) }
     }
 
-    val overlayOpen = screen == Screen.Drawer || screen == Screen.Settings
+    val overlayOpen = screen == Screen.Drawer || screen == Screen.Settings || screen == Screen.Control
     val homeScale by animateFloatAsState(if (overlayOpen) 0.92f else 1f, tween(380), label = "homeScale")
-    val homeAlpha by animateFloatAsState(if (overlayOpen) 0.3f else 1f, tween(380), label = "homeAlpha")
+    val homeAlphaTarget = when (screen) {
+        Screen.Drawer, Screen.Settings -> 0f
+        Screen.Control -> 0.5f
+        else -> 1f
+    }
+    val homeAlpha by animateFloatAsState(homeAlphaTarget, tween(380), label = "homeAlpha")
 
     val enter = slideInVertically(tween(380)) { it / 4 } + fadeIn(tween(380))
     val exit = slideOutVertically(tween(300)) { it / 4 } + fadeOut(tween(250))
@@ -149,7 +154,8 @@ fun NovaApp(homeSignal: Int) {
                         prefs = prefs,
                         dock = dockApps,
                         onOpenDrawer = { screen = Screen.Drawer },
-                        onOpenSettings = { screen = Screen.Settings }
+                        onOpenSettings = { screen = Screen.Settings },
+                        onOpenControl = { screen = Screen.Control }
                     )
                 }
             }
@@ -180,6 +186,14 @@ fun NovaApp(homeSignal: Int) {
                     onBack = { screen = Screen.Home }
                 )
             }
+
+            AnimatedVisibility(
+                visible = screen == Screen.Control,
+                enter = slideInVertically(tween(350)) { -it } + fadeIn(tween(250)),
+                exit = slideOutVertically(tween(300)) { -it } + fadeOut(tween(250))
+            ) {
+                ControlCenterScreen(onClose = { screen = Screen.Home })
+            }
         }
     }
 }
@@ -207,7 +221,8 @@ private fun HomeScreen(
     prefs: NovaPrefs,
     dock: List<AppInfo>,
     onOpenDrawer: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenControl: () -> Unit
 ) {
     val context = LocalContext.current
     val accent = LocalAccent.current
@@ -244,7 +259,11 @@ private fun HomeScreen(
                 detectDragGestures(
                     onDragStart = { dx = 0f; dy = 0f },
                     onDrag = { _, d -> dx += d.x; dy += d.y },
-                    onDragEnd = { if (abs(dy) > abs(dx) && dy < -120f) onOpenDrawer() }
+                    onDragEnd = {
+                        if (abs(dy) > abs(dx)) {
+                            if (dy < -120f) onOpenDrawer() else if (dy > 120f) onOpenControl()
+                        }
+                    }
                 )
             }
             .pointerInput(Unit) { detectTapGestures(onLongPress = { onOpenSettings() }) }
@@ -375,7 +394,7 @@ private fun DrawerScreen(
                     item(key = "header_$letter", span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             letter.toString(), color = accent, fontSize = 13.sp, letterSpacing = 3.sp,
-                            modifier = Modifier.padding(start = 8.dp, top = 14.dp, bottom = 2.dp)
+                            modifier = Modifier.padding(start = 8.dp, top = 6.dp, bottom = 2.dp)
                         )
                     }
                 }
