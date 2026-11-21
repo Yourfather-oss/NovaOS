@@ -6,47 +6,84 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nova.os.data.*
+import com.nova.os.data.AppInfo
+import com.nova.os.data.NovaPrefs
+import com.nova.os.data.SettingsStore
+import com.nova.os.data.SysStats
+import com.nova.os.data.defaultDock
+import com.nova.os.data.launchApp
+import com.nova.os.data.loadApps
+import com.nova.os.data.openAppInfo
+import com.nova.os.data.readStats
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
@@ -64,7 +101,6 @@ fun NovaApp(homeSignal: Int) {
     var refresh by remember { mutableIntStateOf(0) }
     LaunchedEffect(refresh) { apps = withContext(Dispatchers.Default) { loadApps(context) } }
 
-    // Re-scan when apps are installed or removed.
     DisposableEffect(Unit) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, i: Intent?) { refresh++ }
@@ -92,34 +128,57 @@ fun NovaApp(homeSignal: Int) {
         scope.launch { store.setDock(current) }
     }
 
+    val overlayOpen = screen == Screen.Drawer || screen == Screen.Settings
+    val homeScale by animateFloatAsState(if (overlayOpen) 0.92f else 1f, tween(380), label = "homeScale")
+    val homeAlpha by animateFloatAsState(if (overlayOpen) 0.3f else 1f, tween(380), label = "homeAlpha")
+
+    val enter = slideInVertically(tween(380)) { it / 4 } + fadeIn(tween(380))
+    val exit = slideOutVertically(tween(300)) { it / 4 } + fadeOut(tween(250))
+
     NovaTheme(prefs.accent) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(DeepSpace, Obsidian)))
-        ) {
-            Crossfade(targetState = screen, label = "screen") { s ->
-                when (s) {
-                    Screen.Splash -> SplashScreen()
-                    Screen.Home -> HomeScreen(
+        Box(Modifier.fillMaxSize().background(Obsidian)) {
+            NovaBackdrop(prefs.wallpaper)
+
+            if (screen != Screen.Splash) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { scaleX = homeScale; scaleY = homeScale; alpha = homeAlpha }
+                ) {
+                    HomeScreen(
                         prefs = prefs,
                         dock = dockApps,
                         onOpenDrawer = { screen = Screen.Drawer },
                         onOpenSettings = { screen = Screen.Settings }
                     )
-                    Screen.Drawer -> DrawerScreen(
-                        apps = apps,
-                        dockPackages = dockPackages,
-                        onToggleDock = ::toggleDock,
-                        onClose = { screen = Screen.Home }
-                    )
-                    Screen.Settings -> SettingsScreen(
-                        prefs = prefs,
-                        onAccent = { scope.launch { store.setAccent(it) } },
-                        onUse24h = { scope.launch { store.setUse24h(it) } },
-                        onBack = { screen = Screen.Home }
-                    )
                 }
+            }
+
+            AnimatedVisibility(
+                visible = screen == Screen.Splash,
+                enter = fadeIn(),
+                exit = fadeOut(tween(500))
+            ) { SplashScreen() }
+
+            AnimatedVisibility(visible = screen == Screen.Drawer, enter = enter, exit = exit) {
+                DrawerScreen(
+                    apps = apps,
+                    dockPackages = dockPackages,
+                    iconShape = prefs.iconShape,
+                    onToggleDock = ::toggleDock,
+                    onClose = { screen = Screen.Home }
+                )
+            }
+
+            AnimatedVisibility(visible = screen == Screen.Settings, enter = enter, exit = exit) {
+                SettingsScreen(
+                    prefs = prefs,
+                    onAccent = { scope.launch { store.setAccent(it) } },
+                    onUse24h = { scope.launch { store.setUse24h(it) } },
+                    onWallpaper = { scope.launch { store.setWallpaper(it) } },
+                    onIconShape = { scope.launch { store.setIconShape(it) } },
+                    onBack = { screen = Screen.Home }
+                )
             }
         }
     }
@@ -129,11 +188,7 @@ fun NovaApp(homeSignal: Int) {
 private fun SplashScreen() {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
-    val alpha by androidx.compose.animation.core.animateFloatAsState(
-        if (visible) 1f else 0f,
-        androidx.compose.animation.core.tween(900),
-        label = "splash"
-    )
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(900), label = "splash")
     Column(
         Modifier.fillMaxSize().alpha(alpha),
         verticalArrangement = Arrangement.Center,
@@ -164,22 +219,32 @@ private fun HomeScreen(
             delay(1000 - (System.currentTimeMillis() % 1000))
         }
     }
+    var stats by remember { mutableStateOf(SysStats()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            stats = withContext(Dispatchers.IO) { readStats(context) }
+            delay(15000)
+        }
+    }
+
     val time = now.format(DateTimeFormatter.ofPattern(if (prefs.use24h) "HH:mm" else "hh:mm"))
     val date = now.format(DateTimeFormatter.ofPattern("EEEE, d MMMM"))
+    val greeting = when {
+        now.hour < 12 -> "GOOD MORNING"
+        now.hour < 17 -> "GOOD AFTERNOON"
+        else -> "GOOD EVENING"
+    }
 
     Box(
         Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                var dy = 0f; var dx = 0f
+                var dy = 0f
+                var dx = 0f
                 detectDragGestures(
                     onDragStart = { dx = 0f; dy = 0f },
                     onDrag = { _, d -> dx += d.x; dy += d.y },
-                    onDragEnd = {
-                        if (abs(dy) > abs(dx) && dy < -120f) onOpenDrawer()
-                        // Swipe down / left / right reserved for control centre,
-                        // intelligence dashboard and widget space (later milestones).
-                    }
+                    onDragEnd = { if (abs(dy) > abs(dx) && dy < -120f) onOpenDrawer() }
                 )
             }
             .pointerInput(Unit) { detectTapGestures(onLongPress = { onOpenSettings() }) }
@@ -187,11 +252,27 @@ private fun HomeScreen(
             .navigationBarsPadding()
             .padding(horizontal = 24.dp)
     ) {
-        Column(Modifier.align(Alignment.TopStart).padding(top = 72.dp)) {
-            Text(time, color = TextPrimary, fontSize = 84.sp, fontWeight = FontWeight.Thin)
-            Text(date, color = TextMuted, fontSize = 16.sp, letterSpacing = 1.sp)
+        Column(Modifier.align(Alignment.TopStart).padding(top = 56.dp)) {
+            Text(greeting, color = accent, fontSize = 12.sp, letterSpacing = 4.sp)
             Spacer(Modifier.height(4.dp))
-            Box(Modifier.width(36.dp).height(2.dp).background(accent))
+            BasicText(
+                time,
+                style = TextStyle(
+                    brush = Brush.horizontalGradient(listOf(TextPrimary, TextPrimary, accent)),
+                    fontSize = 92.sp,
+                    fontWeight = FontWeight.Thin
+                )
+            )
+            Text(date, color = TextMuted, fontSize = 16.sp, letterSpacing = 1.sp)
+            Spacer(Modifier.height(36.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCard(
+                    if (stats.charging) "Charging" else "Battery",
+                    "${stats.battery}%", stats.battery / 100f, Modifier.weight(1f)
+                )
+                StatCard("Storage", "${stats.storagePct}%", stats.storagePct / 100f, Modifier.weight(1f))
+                StatCard("Memory", "${stats.ramPct}%", stats.ramPct / 100f, Modifier.weight(1f))
+            }
         }
 
         Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
@@ -199,9 +280,7 @@ private fun HomeScreen(
                 Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(GlassFill)
-                    .border(1.dp, GlassBorder, RoundedCornerShape(26.dp))
+                    .glass(RoundedCornerShape(26.dp))
                     .clickable { onOpenDrawer() }
                     .padding(horizontal = 20.dp),
                 contentAlignment = Alignment.CenterStart
@@ -212,20 +291,18 @@ private fun HomeScreen(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(GlassFill)
-                    .border(1.dp, GlassBorder, RoundedCornerShape(28.dp))
+                    .glass(RoundedCornerShape(30.dp))
                     .padding(vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 if (dock.isEmpty()) {
                     Text("Long-press an app in the drawer to pin it here", color = TextMuted, fontSize = 12.sp)
                 }
                 dock.forEach { app ->
-                    Image(
-                        bitmap = app.icon,
-                        contentDescription = app.label,
-                        modifier = Modifier.size(52.dp).clickable { launchApp(context, app) }
+                    NovaIcon(
+                        app, 54.dp, prefs.iconShape,
+                        Modifier.bounceClick { launchApp(context, app) }
                     )
                 }
             }
@@ -233,11 +310,11 @@ private fun HomeScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DrawerScreen(
     apps: List<AppInfo>,
     dockPackages: List<String>,
+    iconShape: String,
     onToggleDock: (AppInfo) -> Unit,
     onClose: () -> Unit
 ) {
@@ -247,11 +324,17 @@ private fun DrawerScreen(
     val filtered = remember(apps, query) {
         if (query.isBlank()) apps else apps.filter { it.label.contains(query, ignoreCase = true) }
     }
+    val grouped = remember(filtered) {
+        filtered.groupBy { app ->
+            app.label.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#'
+        }.toSortedMap()
+    }
 
     Column(
         Modifier
             .fillMaxSize()
-            .background(Obsidian.copy(alpha = 0.92f))
+            .background(Brush.verticalGradient(listOf(Obsidian.copy(alpha = 0.90f), Obsidian.copy(alpha = 0.97f))))
+            .blockTouches()
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(horizontal = 16.dp)
@@ -260,8 +343,10 @@ private fun DrawerScreen(
         Box(
             Modifier
                 .align(Alignment.CenterHorizontally)
-                .width(40.dp).height(4.dp)
-                .clip(CircleShape).background(GlassBorder)
+                .width(40.dp)
+                .height(4.dp)
+                .clip(CircleShape)
+                .background(GlassBorder)
                 .clickable { onClose() }
         )
         Spacer(Modifier.height(16.dp))
@@ -269,14 +354,12 @@ private fun DrawerScreen(
             value = query,
             onValueChange = { query = it },
             singleLine = true,
-            textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontSize = 16.sp),
+            textStyle = TextStyle(color = TextPrimary, fontSize = 16.sp),
             cursorBrush = SolidColor(accent),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
-                .clip(RoundedCornerShape(26.dp))
-                .background(GlassFill)
-                .border(1.dp, GlassBorder, RoundedCornerShape(26.dp)),
+                .glass(RoundedCornerShape(26.dp)),
             decorationBox = { inner ->
                 Box(Modifier.padding(horizontal = 20.dp), contentAlignment = Alignment.CenterStart) {
                     if (query.isEmpty()) Text("Search apps", color = TextMuted, fontSize = 16.sp)
@@ -284,38 +367,46 @@ private fun DrawerScreen(
                 }
             }
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
 
         LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxSize()) {
-            items(filtered, key = { it.component.flattenToString() }) { app ->
-                var menu by remember { mutableStateOf(false) }
-                val pinned = app.packageName in dockPackages
-                Box {
-                    Column(
-                        Modifier
-                            .padding(vertical = 10.dp)
-                            .combinedClickable(
-                                onClick = { launchApp(context, app) },
-                                onLongClick = { menu = true }
-                            ),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Image(bitmap = app.icon, contentDescription = app.label, modifier = Modifier.size(54.dp))
-                        Spacer(Modifier.height(6.dp))
+            grouped.forEach { (letter, list) ->
+                if (query.isBlank()) {
+                    item(key = "header_$letter", span = { GridItemSpan(maxLineSpan) }) {
                         Text(
-                            app.label, color = TextPrimary, fontSize = 11.sp,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
+                            letter.toString(), color = accent, fontSize = 13.sp, letterSpacing = 3.sp,
+                            modifier = Modifier.padding(start = 8.dp, top = 14.dp, bottom = 2.dp)
                         )
                     }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(
-                            text = { Text(if (pinned) "Remove from dock" else "Add to dock") },
-                            onClick = { menu = false; onToggleDock(app) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("App info") },
-                            onClick = { menu = false; openAppInfo(context, app) }
-                        )
+                }
+                items(list, key = { it.component.flattenToString() }) { app ->
+                    var menu by remember { mutableStateOf(false) }
+                    val pinned = app.packageName in dockPackages
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp, horizontal = 2.dp)
+                                .bounceClick(onLongClick = { menu = true }) { launchApp(context, app) },
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            NovaIcon(app, 54.dp, iconShape)
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                app.label, color = TextPrimary, fontSize = 11.sp,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
+                            )
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(if (pinned) "Remove from dock" else "Add to dock") },
+                                onClick = { menu = false; onToggleDock(app) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("App info") },
+                                onClick = { menu = false; openAppInfo(context, app) }
+                            )
+                        }
                     }
                 }
             }
@@ -328,6 +419,8 @@ private fun SettingsScreen(
     prefs: NovaPrefs,
     onAccent: (String) -> Unit,
     onUse24h: (Boolean) -> Unit,
+    onWallpaper: (String) -> Unit,
+    onIconShape: (String) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -336,15 +429,33 @@ private fun SettingsScreen(
     Column(
         Modifier
             .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Obsidian.copy(alpha = 0.90f), Obsidian.copy(alpha = 0.97f))))
+            .blockTouches()
             .statusBarsPadding()
             .navigationBarsPadding()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
         Text("NOVA Settings", color = TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Light)
         Spacer(Modifier.height(28.dp))
 
-        Text("ACCENT", color = TextMuted, fontSize = 11.sp, letterSpacing = 3.sp)
-        Spacer(Modifier.height(12.dp))
+        SectionLabel("WALLPAPER")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OptionChip("Aurora", prefs.wallpaper == "aurora") { onWallpaper("aurora") }
+            OptionChip("Nebula", prefs.wallpaper == "nebula") { onWallpaper("nebula") }
+            OptionChip("Midnight", prefs.wallpaper == "midnight") { onWallpaper("midnight") }
+        }
+
+        Spacer(Modifier.height(28.dp))
+        SectionLabel("ICON SHAPE")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OptionChip("Squircle", prefs.iconShape == "squircle") { onIconShape("squircle") }
+            OptionChip("Circle", prefs.iconShape == "circle") { onIconShape("circle") }
+            OptionChip("Original", prefs.iconShape == "original") { onIconShape("original") }
+        }
+
+        Spacer(Modifier.height(28.dp))
+        SectionLabel("ACCENT")
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             listOf("cyan" to Cyan, "violet" to Nebula).forEach { (name, color) ->
                 Box(
@@ -380,14 +491,18 @@ private fun SettingsScreen(
 }
 
 @Composable
+private fun SectionLabel(text: String) {
+    Text(text, color = TextMuted, fontSize = 11.sp, letterSpacing = 3.sp)
+    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
 private fun SettingsButton(label: String, onClick: () -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
             .height(52.dp)
-            .clip(RoundedCornerShape(26.dp))
-            .background(GlassFill)
-            .border(1.dp, GlassBorder, RoundedCornerShape(26.dp))
+            .glass(RoundedCornerShape(26.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) { Text(label, color = TextPrimary, fontSize = 15.sp) }

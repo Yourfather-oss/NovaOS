@@ -1,9 +1,16 @@
 package com.nova.os.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.dp
 
 val Obsidian = Color(0xFF080B12)
 val DeepSpace = Color(0xFF101B2A)
@@ -22,3 +29,9 @@ fun accentFor(name: String): Color = if (name == "violet") Nebula else Cyan
 fun NovaTheme(accentName: String, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalAccent provides accentFor(accentName), content = content)
 }
+
+/** Simulated frosted glass: light gradient fill with a bright top edge. */
+fun Modifier.glass(shape: Shape): Modifier = this
+    .clip(shape)
+    .background(Brush.verticalGradient(listOf(Color(0x30FFFFFF), Color(0x0FFFFFFF))))
+    .border(1.dp, Brush.verticalGradient(listOf(Color(0x66FFFFFF), Color(0x14FFFFFF))), shape)
