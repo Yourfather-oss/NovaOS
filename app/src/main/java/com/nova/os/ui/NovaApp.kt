@@ -18,6 +18,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +35,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -66,7 +69,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -151,6 +156,9 @@ fun NovaApp(homeSignal: Int) {
             "dashboard" -> screen = Screen.Dashboard
             "widgets" -> screen = Screen.Widgets
             "studio" -> screen = Screen.Settings
+            "mode" -> scope.launch {
+                store.put("home_mode", if (prefs.homeMode == "classic") "nova" else "classic")
+            }
             else -> {}
         }
     }
@@ -203,7 +211,12 @@ fun NovaApp(homeSignal: Int) {
                         onAction = ::runAction,
                         onLaunch = ::launchTracked,
                         recent = recent,
-                        timerText = timerText
+                        timerText = timerText,
+                        allApps = visibleApps,
+                        dockPackages = dockPackages,
+                        onToggleDock = ::toggleDock,
+                        onHide = ::hideApp,
+                        homeSignal = homeSignal
                     )
                 }
             }
@@ -303,12 +316,26 @@ private fun HomeScreen(
     onAction: (String) -> Unit,
     onLaunch: (AppInfo) -> Unit,
     recent: List<AppInfo>,
-    timerText: String?
+    timerText: String?,
+    allApps: List<AppInfo>,
+    dockPackages: List<String>,
+    onToggleDock: (AppInfo) -> Unit,
+    onHide: (AppInfo) -> Unit,
+    homeSignal: Int
 ) {
     val context = LocalContext.current
     val accent = LocalAccent.current
     val latestPrefs by rememberUpdatedState(prefs)
     val latestAction by rememberUpdatedState(onAction)
+
+    val classic = prefs.homeMode == "classic"
+    val pages = remember(allApps) { allApps.chunked(CLASSIC_PER_PAGE) }
+    val pageCount = maxOf(1, pages.size)
+    val latestPageCount by rememberUpdatedState(pageCount)
+    val pagerState = rememberPagerState(pageCount = { pageCount })
+    LaunchedEffect(homeSignal) {
+        if (homeSignal > 0 && classic) pagerState.animateScrollToPage(0)
+    }
 
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
@@ -337,19 +364,32 @@ private fun HomeScreen(
         Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                var dy = 0f
-                var dx = 0f
-                detectDragGestures(
-                    onDragStart = { dx = 0f; dy = 0f },
-                    onDrag = { _, d -> dx += d.x; dy += d.y },
-                    onDragEnd = {
-                        if (abs(dy) > abs(dx)) {
-                            if (dy < -120f) latestAction(latestPrefs.gestureUp) else if (dy > 120f) latestAction(latestPrefs.gestureDown)
-                        } else {
-                            if (dx < -120f) latestAction(latestPrefs.gestureLeft) else if (dx > 120f) latestAction(latestPrefs.gestureRight)
-                        }
+                // Observes the gesture before children see it, without consuming it,
+                // so the classic-mode pager can still scroll normally.
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    val startPage = pagerState.currentPage
+                    var dx = 0f
+                    var dy = 0f
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) break
+                        val delta = change.positionChange()
+                        dx += delta.x
+                        dy += delta.y
                     }
-                )
+                    val p = latestPrefs
+                    if (abs(dy) > abs(dx)) {
+                        if (dy < -120f) latestAction(p.gestureUp) else if (dy > 120f) latestAction(p.gestureDown)
+                    } else if (p.homeMode != "classic") {
+                        if (dx < -120f) latestAction(p.gestureLeft) else if (dx > 120f) latestAction(p.gestureRight)
+                    } else {
+                        // Classic mode: swiping past the first or last page opens the side pages.
+                        if (dx > 120f && startPage == 0) latestAction(p.gestureRight)
+                        else if (dx < -120f && startPage >= latestPageCount - 1) latestAction(p.gestureLeft)
+                    }
+                }
             }
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -361,7 +401,21 @@ private fun HomeScreen(
             .navigationBarsPadding()
             .padding(horizontal = 24.dp)
     ) {
-        Column(Modifier.align(Alignment.TopStart).padding(top = 56.dp)) {
+        if (classic) {
+            ClassicHome(
+                pages = pages,
+                pagerState = pagerState,
+                prefs = prefs,
+                time = time,
+                date = date,
+                timerText = timerText,
+                dockPackages = dockPackages,
+                onLaunch = onLaunch,
+                onToggleDock = onToggleDock,
+                onHide = onHide,
+                modifier = Modifier.fillMaxSize().padding(top = 28.dp, bottom = (prefs.iconSize + 128).dp)
+            )
+        } else Column(Modifier.align(Alignment.TopStart).padding(top = 56.dp)) {
             Text(greeting, color = accent, fontSize = 12.sp, letterSpacing = 4.sp)
             Spacer(Modifier.height(4.dp))
             BasicText(

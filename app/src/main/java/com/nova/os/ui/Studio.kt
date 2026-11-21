@@ -62,6 +62,19 @@ fun DesignStudioScreen(prefs: NovaPrefs, store: SettingsStore, onBack: () -> Uni
         Preview(prefs)
 
         Spacer(Modifier.height(28.dp))
+        Label("HOME MODE")
+        ChipRow(
+            listOf("nova" to "NOVA", "classic" to "Classic"),
+            prefs.homeMode
+        ) { scope.launch { store.put("home_mode", it) } }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (prefs.homeMode == "classic") "All apps sit on home pages. Swipe up for the A–Z drawer."
+            else "Clean home with the A–Z app drawer. Swipe up to open it.",
+            color = TextMuted, fontSize = 12.sp
+        )
+
+        Spacer(Modifier.height(28.dp))
         Label("SURFACE")
         ChipRow(
             listOf("glass" to "Glass", "matte" to "Matte", "clear" to "Clear"),
@@ -255,7 +268,7 @@ private fun StudioButton(label: String, onClick: () -> Unit) {
     ) { Text(label, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Normal) }
 }
 
-private val gestureOptions = listOf("drawer", "control", "dashboard", "widgets", "studio", "none")
+private val gestureOptions = listOf("drawer", "control", "dashboard", "widgets", "studio", "mode", "none")
 
 private fun gestureName(k: String) = when (k) {
     "drawer" -> "App drawer"
@@ -263,6 +276,7 @@ private fun gestureName(k: String) = when (k) {
     "dashboard" -> "Dashboard"
     "widgets" -> "Widgets"
     "studio" -> "Design Studio"
+    "mode" -> "Toggle home mode"
     else -> "Nothing"
 }
 

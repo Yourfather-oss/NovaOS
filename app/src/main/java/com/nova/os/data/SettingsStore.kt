@@ -33,7 +33,8 @@ data class NovaPrefs(
     val gestureRight: String = "widgets",
     val gestureLong: String = "studio",
     val gestureDouble: String = "none",
-    val hidden: List<String> = emptyList()
+    val hidden: List<String> = emptyList(),
+    val homeMode: String = "nova"
 )
 
 class SettingsStore(private val context: Context) {
@@ -76,7 +77,8 @@ class SettingsStore(private val context: Context) {
             gestureRight = p[stringPreferencesKey("g_right")] ?: "widgets",
             gestureLong = p[stringPreferencesKey("g_long")] ?: "studio",
             gestureDouble = p[stringPreferencesKey("g_double")] ?: "none",
-            hidden = (p[stringPreferencesKey("hidden")] ?: "").split(",").filter { it.isNotBlank() }
+            hidden = (p[stringPreferencesKey("hidden")] ?: "").split(",").filter { it.isNotBlank() },
+            homeMode = p[stringPreferencesKey("home_mode")] ?: "nova"
         )
     }
 
