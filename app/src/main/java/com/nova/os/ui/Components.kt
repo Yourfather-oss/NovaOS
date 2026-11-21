@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nova.os.data.AppInfo
+import kotlin.math.abs
 
 /** Springy press feedback with haptics on long-press. */
 fun Modifier.bounceClick(onLongClick: (() -> Unit)? = null, onClick: () -> Unit): Modifier = composed {
@@ -133,4 +135,22 @@ fun OptionChip(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Text(label, color = if (selected) accent else TextPrimary, fontSize = 14.sp)
     }
+}
+
+/** Horizontal swipe detector for side pages. */
+fun Modifier.horizontalSwipe(
+    onSwipeLeft: (() -> Unit)? = null,
+    onSwipeRight: (() -> Unit)? = null
+): Modifier = pointerInput(Unit) {
+    var dx = 0f
+    var dy = 0f
+    detectDragGestures(
+        onDragStart = { dx = 0f; dy = 0f },
+        onDrag = { _, d -> dx += d.x; dy += d.y },
+        onDragEnd = {
+            if (abs(dx) > abs(dy) * 1.5f) {
+                if (dx < -150f) onSwipeLeft?.invoke() else if (dx > 150f) onSwipeRight?.invoke()
+            }
+        }
+    )
 }

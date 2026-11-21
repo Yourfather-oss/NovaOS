@@ -11,7 +11,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -88,7 +90,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
-private enum class Screen { Splash, Home, Drawer, Settings, Control }
+private enum class Screen { Splash, Home, Drawer, Settings, Control, Dashboard, Widgets }
 
 @Composable
 fun NovaApp(homeSignal: Int) {
@@ -117,7 +119,7 @@ fun NovaApp(homeSignal: Int) {
     var screen by remember { mutableStateOf(Screen.Splash) }
     LaunchedEffect(Unit) { delay(1600); screen = Screen.Home }
     LaunchedEffect(homeSignal) { if (screen != Screen.Splash) screen = Screen.Home }
-    BackHandler(enabled = screen == Screen.Drawer || screen == Screen.Settings || screen == Screen.Control) { screen = Screen.Home }
+    BackHandler(enabled = screen != Screen.Splash && screen != Screen.Home) { screen = Screen.Home }
 
     val dockPackages = prefs.dock ?: defaultDock(apps)
     val dockApps = dockPackages.mapNotNull { pkg -> apps.firstOrNull { it.packageName == pkg } }
@@ -128,10 +130,29 @@ fun NovaApp(homeSignal: Int) {
         scope.launch { store.setDock(current) }
     }
 
-    val overlayOpen = screen == Screen.Drawer || screen == Screen.Settings || screen == Screen.Control
+    fun launchTracked(app: AppInfo) {
+        launchApp(context, app)
+        scope.launch { store.logLaunch(app.packageName) }
+    }
+
+    val recent = remember(prefs.launchLog, apps) { recentApps(prefs.launchLog, apps, 5) }
+
+    var timerPreset by remember { mutableIntStateOf(25) }
+    var timerLeft by remember { mutableIntStateOf(25 * 60) }
+    var timerRunning by remember { mutableStateOf(false) }
+    LaunchedEffect(timerRunning) {
+        while (timerRunning && timerLeft > 0) {
+            delay(1000)
+            timerLeft--
+        }
+        if (timerLeft <= 0) timerRunning = false
+    }
+    val timerText = if (timerRunning) "%02d:%02d".format(timerLeft / 60, timerLeft % 60) else null
+
+    val overlayOpen = screen != Screen.Splash && screen != Screen.Home
     val homeScale by animateFloatAsState(if (overlayOpen) 0.92f else 1f, tween(380), label = "homeScale")
     val homeAlphaTarget = when (screen) {
-        Screen.Drawer, Screen.Settings -> 0f
+        Screen.Drawer, Screen.Settings, Screen.Dashboard, Screen.Widgets -> 0f
         Screen.Control -> 0.5f
         else -> 1f
     }
@@ -155,7 +176,12 @@ fun NovaApp(homeSignal: Int) {
                         dock = dockApps,
                         onOpenDrawer = { screen = Screen.Drawer },
                         onOpenSettings = { screen = Screen.Settings },
-                        onOpenControl = { screen = Screen.Control }
+                        onOpenControl = { screen = Screen.Control },
+                        onOpenDashboard = { screen = Screen.Dashboard },
+                        onOpenWidgets = { screen = Screen.Widgets },
+                        onLaunch = ::launchTracked,
+                        recent = recent,
+                        timerText = timerText
                     )
                 }
             }
@@ -172,6 +198,7 @@ fun NovaApp(homeSignal: Int) {
                     dockPackages = dockPackages,
                     iconShape = prefs.iconShape,
                     onToggleDock = ::toggleDock,
+                    onLaunch = ::launchTracked,
                     onClose = { screen = Screen.Home }
                 )
             }
@@ -193,6 +220,40 @@ fun NovaApp(homeSignal: Int) {
                 exit = slideOutVertically(tween(300)) { -it } + fadeOut(tween(250))
             ) {
                 ControlCenterScreen(onClose = { screen = Screen.Home })
+            }
+
+            AnimatedVisibility(
+                visible = screen == Screen.Dashboard,
+                enter = slideInHorizontally(tween(350)) { it } + fadeIn(tween(250)),
+                exit = slideOutHorizontally(tween(300)) { it } + fadeOut(tween(250))
+            ) {
+                DashboardScreen(
+                    prefs = prefs,
+                    apps = apps,
+                    onLaunch = ::launchTracked,
+                    onClose = { screen = Screen.Home }
+                )
+            }
+
+            AnimatedVisibility(
+                visible = screen == Screen.Widgets,
+                enter = slideInHorizontally(tween(350)) { -it } + fadeIn(tween(250)),
+                exit = slideOutHorizontally(tween(300)) { -it } + fadeOut(tween(250))
+            ) {
+                WidgetsScreen(
+                    note = prefs.note,
+                    onNote = { scope.launch { store.setNote(it) } },
+                    timerLeft = timerLeft,
+                    timerRunning = timerRunning,
+                    timerPreset = timerPreset,
+                    onTimerToggle = {
+                        if (!timerRunning && timerLeft <= 0) timerLeft = timerPreset * 60
+                        timerRunning = !timerRunning
+                    },
+                    onTimerReset = { timerRunning = false; timerLeft = timerPreset * 60 },
+                    onTimerPreset = { timerPreset = it; timerRunning = false; timerLeft = it * 60 },
+                    onClose = { screen = Screen.Home }
+                )
             }
         }
     }
@@ -222,7 +283,12 @@ private fun HomeScreen(
     dock: List<AppInfo>,
     onOpenDrawer: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenControl: () -> Unit
+    onOpenControl: () -> Unit,
+    onOpenDashboard: () -> Unit,
+    onOpenWidgets: () -> Unit,
+    onLaunch: (AppInfo) -> Unit,
+    recent: List<AppInfo>,
+    timerText: String?
 ) {
     val context = LocalContext.current
     val accent = LocalAccent.current
@@ -262,6 +328,8 @@ private fun HomeScreen(
                     onDragEnd = {
                         if (abs(dy) > abs(dx)) {
                             if (dy < -120f) onOpenDrawer() else if (dy > 120f) onOpenControl()
+                        } else {
+                            if (dx < -120f) onOpenDashboard() else if (dx > 120f) onOpenWidgets()
                         }
                     }
                 )
@@ -283,6 +351,10 @@ private fun HomeScreen(
                 )
             )
             Text(date, color = TextMuted, fontSize = 16.sp, letterSpacing = 1.sp)
+            if (timerText != null) {
+                Spacer(Modifier.height(4.dp))
+                Text("FOCUS  $timerText", color = accent, fontSize = 12.sp, letterSpacing = 3.sp)
+            }
             Spacer(Modifier.height(36.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatCard(
@@ -291,6 +363,14 @@ private fun HomeScreen(
                 )
                 StatCard("Storage", "${stats.storagePct}%", stats.storagePct / 100f, Modifier.weight(1f))
                 StatCard("Memory", "${stats.ramPct}%", stats.ramPct / 100f, Modifier.weight(1f))
+            }
+            if (recent.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp)).padding(14.dp)) {
+                    Text("RECENT", color = TextMuted, fontSize = 10.sp, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(10.dp))
+                    IconRow(recent, prefs.iconShape, onLaunch)
+                }
             }
         }
 
@@ -321,7 +401,7 @@ private fun HomeScreen(
                 dock.forEach { app ->
                     NovaIcon(
                         app, 54.dp, prefs.iconShape,
-                        Modifier.bounceClick { launchApp(context, app) }
+                        Modifier.bounceClick { onLaunch(app) }
                     )
                 }
             }
@@ -335,6 +415,7 @@ private fun DrawerScreen(
     dockPackages: List<String>,
     iconShape: String,
     onToggleDock: (AppInfo) -> Unit,
+    onLaunch: (AppInfo) -> Unit,
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
@@ -406,7 +487,7 @@ private fun DrawerScreen(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 10.dp, horizontal = 2.dp)
-                                .bounceClick(onLongClick = { menu = true }) { launchApp(context, app) },
+                                .bounceClick(onLongClick = { menu = true }) { onLaunch(app) },
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             NovaIcon(app, 54.dp, iconShape)
