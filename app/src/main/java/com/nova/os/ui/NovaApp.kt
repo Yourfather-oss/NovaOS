@@ -282,6 +282,7 @@ fun NovaApp(homeSignal: Int) {
                     iconShape = prefs.iconShape,
                     iconSize = prefs.iconSize,
                     showLabels = prefs.showLabels,
+                    launchLog = prefs.launchLog,
                     onToggleDock = ::toggleDock,
                     onLaunch = ::launchTracked,
                     onHide = ::hideApp,
