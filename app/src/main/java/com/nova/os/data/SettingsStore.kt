@@ -48,11 +48,12 @@ data class NovaPrefs(
     val wallpaperRev: Long = 0L,
     val weather: String = "",
     val homeWeather: Boolean = true,
-    val homeStats: Boolean = true,
+    val homeStats: Boolean = false,
     val homeUpcoming: Boolean = true,
-    val homeMusic: Boolean = true,
+    val homeMusic: Boolean = false,
     val homeFrequent: Boolean = true,
-    val homeNote: Boolean = true
+    val homeNote: Boolean = true,
+    val homeOrder: String = "frequent,upcoming,stats,music,note"
 )
 
 class SettingsStore(private val context: Context) {
@@ -110,11 +111,12 @@ class SettingsStore(private val context: Context) {
             wallpaperRev = p[stringPreferencesKey("wallpaper_rev")]?.toLongOrNull() ?: 0L,
             weather = p[stringPreferencesKey("weather")] ?: "",
             homeWeather = p[booleanPreferencesKey("w_weather")] ?: true,
-            homeStats = p[booleanPreferencesKey("w_stats")] ?: true,
+            homeStats = p[booleanPreferencesKey("w_stats")] ?: false,
             homeUpcoming = p[booleanPreferencesKey("w_upcoming")] ?: true,
-            homeMusic = p[booleanPreferencesKey("w_music")] ?: true,
+            homeMusic = p[booleanPreferencesKey("w_music")] ?: false,
             homeFrequent = p[booleanPreferencesKey("w_frequent")] ?: true,
-            homeNote = p[booleanPreferencesKey("w_note")] ?: true
+            homeNote = p[booleanPreferencesKey("w_note")] ?: true,
+            homeOrder = p[stringPreferencesKey("home_order")] ?: "frequent,upcoming,stats,music,note"
         )
     }
 

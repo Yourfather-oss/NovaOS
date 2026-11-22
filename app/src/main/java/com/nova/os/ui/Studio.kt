@@ -150,7 +150,29 @@ fun DesignStudioScreen(
         ToggleRow("Frequently used apps", prefs.homeFrequent) { scope.launch { store.put("w_frequent", it) } }
         ToggleRow("Note card", prefs.homeNote) { scope.launch { store.put("w_note", it) } }
         Spacer(Modifier.height(4.dp))
-        Text("If the screen is too short for everything, NOVA hides the lowest-priority widgets automatically.", color = TextMuted, fontSize = 12.sp)
+        Spacer(Modifier.height(20.dp))
+        Label("HOME ORDER (TOP TO BOTTOM)")
+        val homeOrder = normalizeHomeOrder(prefs.homeOrder)
+        homeOrder.forEachIndexed { i, id ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(homeSectionLabel(id), color = TextPrimary, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                OrderButton("▲", i > 0) {
+                    val l = homeOrder.toMutableList()
+                    l[i] = l[i - 1]; l[i - 1] = id
+                    scope.launch { store.put("home_order", l.joinToString(",")) }
+                }
+                Spacer(Modifier.width(8.dp))
+                OrderButton("▼", i < homeOrder.lastIndex) {
+                    val l = homeOrder.toMutableList()
+                    l[i] = l[i + 1]; l[i + 1] = id
+                    scope.launch { store.put("home_order", l.joinToString(",")) }
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text("Tip: long-press the Frequently used row on the home screen to move it right there.", color = TextMuted, fontSize = 12.sp)
+        Spacer(Modifier.height(4.dp))
+        Text("If the screen is too short for everything, NOVA hides widgets from the bottom of this order automatically.", color = TextMuted, fontSize = 12.sp)
 
         Spacer(Modifier.height(28.dp))
         Label("DOCK STYLE")
@@ -403,6 +425,20 @@ private fun WallpaperTile(label: String, colors: List<Color>, selected: Boolean,
         )
         Spacer(Modifier.height(6.dp))
         Text(label, color = if (selected) accent else TextMuted, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun OrderButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(GlassFill)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (enabled) TextPrimary else TextMuted, fontSize = 14.sp)
     }
 }
 

@@ -13,6 +13,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
@@ -90,6 +92,22 @@ private fun hasPermission(context: Context, permission: String) =
  * music player and frequently used apps. Widgets are dropped automatically, lowest priority
  * first, when the page is too short for all of them, so it never feels crowded.
  */
+val HOME_SECTIONS = listOf("frequent", "upcoming", "stats", "music", "note")
+
+fun homeSectionLabel(id: String) = when (id) {
+    "frequent" -> "Frequently used apps"
+    "upcoming" -> "Upcoming today"
+    "stats" -> "System rings"
+    "music" -> "Music player"
+    else -> "Note card"
+}
+
+/** The saved widget order, always containing every section exactly once. */
+fun normalizeHomeOrder(raw: String): List<String> {
+    val saved = raw.split(",").map { it.trim() }.filter { it in HOME_SECTIONS }.distinct()
+    return saved + HOME_SECTIONS.filter { it !in saved }
+}
+
 @Composable
 fun HomeInfo(
     prefs: NovaPrefs,
@@ -108,38 +126,58 @@ fun HomeInfo(
         val used = frequentApps(prefs.launchLog, allApps, 4)
         (used + recent + dock + allApps).distinctBy { it.packageName }.take(4)
     }
+    var moving by remember { mutableStateOf(false) }
+    val orderIds = remember(prefs.homeOrder) { normalizeHomeOrder(prefs.homeOrder) }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val avail = maxHeight
-        val order = listOf(
-            Triple("stats", 84, prefs.homeStats),
-            Triple("frequent", 118, prefs.homeFrequent),
-            Triple("upcoming", 118, prefs.homeUpcoming),
-            Triple("music", 96, prefs.homeMusic),
-            Triple("note", 92, prefs.homeNote && prefs.note.isNotBlank())
+        val enabled = mapOf(
+            "frequent" to prefs.homeFrequent,
+            "upcoming" to prefs.homeUpcoming,
+            "stats" to prefs.homeStats,
+            "music" to prefs.homeMusic,
+            "note" to (prefs.homeNote && prefs.note.isNotBlank())
         )
-        var used = 170.dp + if (timerText != null) 18.dp else 0.dp
+        val heights = mapOf(
+            "frequent" to (if (moving) 150 else 104),
+            "upcoming" to 112,
+            "stats" to 84,
+            "music" to 96,
+            "note" to 92
+        )
+        var used = 150.dp + if (timerText != null) 18.dp else 0.dp
         val show = mutableSetOf<String>()
-        for ((id, h, enabled) in order) {
-            val need = (h + 12).dp
-            if (enabled && used + need <= avail) {
+        for (id in orderIds) {
+            val need = ((heights[id] ?: 100) + 14).dp
+            if (enabled[id] == true && used + need <= avail) {
                 show += id
                 used += need
             }
         }
+        val visible = orderIds.filter { it in show }
+        val move: (String, Int) -> Unit = { id, delta ->
+            val i = visible.indexOf(id)
+            val j = i + delta
+            if (i >= 0 && j in visible.indices) {
+                val list = orderIds.toMutableList()
+                val a = list.indexOf(id)
+                val b = list.indexOf(visible[j])
+                list[a] = visible[j]
+                list[b] = id
+                onPutPref("home_order", list.joinToString(","))
+            }
+        }
 
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Header
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(1f)) {
-                    Text("NOVA", color = accent, fontSize = 14.sp, letterSpacing = 8.sp, fontWeight = FontWeight.Light)
-                    Spacer(Modifier.height(4.dp))
-                    Box(Modifier.width(44.dp).height(2.dp).background(accent))
-                    Spacer(Modifier.height(6.dp))
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Header: wordmark, then the clock and weather on one row, then the date.
+            Column(Modifier.fillMaxWidth()) {
+                Text("NOVA", color = accent, fontSize = 12.sp, letterSpacing = 8.sp, fontWeight = FontWeight.Light)
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     val hours = now.format(DateTimeFormatter.ofPattern(if (prefs.use24h) "HH" else "hh"))
                     val minutes = now.format(DateTimeFormatter.ofPattern("mm"))
                     val baseSp = clockSizeSp(prefs.clockSize).toFloat()
-                    val clockSp = if (prefs.homeWeather) minOf(baseSp * 0.85f, 80f) else baseSp
+                    val clockSp = if (prefs.homeWeather) minOf(baseSp * 0.8f, 72f) else baseSp
                     BasicText(
                         buildAnnotatedString {
                             withStyle(SpanStyle(color = TextPrimary)) { append(hours) }
@@ -154,43 +192,57 @@ fun HomeInfo(
                         maxLines = 1,
                         softWrap = false
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CalendarGlyph(accent)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            now.format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy")),
-                            color = TextMuted, fontSize = 15.sp
-                        )
-                    }
-                    if (timerText != null) {
-                        Spacer(Modifier.height(4.dp))
-                        Text("FOCUS  $timerText", color = accent, fontSize = 12.sp, letterSpacing = 3.sp)
+                    if (prefs.homeWeather) {
+                        Spacer(Modifier.weight(1f))
+                        WeatherCard(prefs, onPutPref)
                     }
                 }
-                if (prefs.homeWeather) {
-                    Spacer(Modifier.width(10.dp))
-                    WeatherCard(prefs, onPutPref)
+                Spacer(Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CalendarGlyph(accent)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        now.format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy")),
+                        color = TextMuted, fontSize = 15.sp
+                    )
+                }
+                if (timerText != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("FOCUS  $timerText", color = accent, fontSize = 12.sp, letterSpacing = 3.sp)
                 }
             }
 
-            if ("stats" in show) StatsCard(stats)
-            if ("upcoming" in show) UpcomingCard(prefs)
-            if ("music" in show) MusicCard()
-            if ("frequent" in show) FrequentCard(frequent, prefs, onLaunch)
-            if ("note" in show) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .glass(RoundedCornerShape(24.dp))
-                        .clickable { onAction("widgets") }
-                        .padding(14.dp)
-                ) {
-                    Text("NOTE", color = TextMuted, fontSize = 10.sp, letterSpacing = 2.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        prefs.note.trim(), color = TextPrimary, fontSize = 14.sp,
-                        maxLines = 3, overflow = TextOverflow.Ellipsis
+            visible.forEach { id ->
+                when (id) {
+                    "stats" -> StatsCard(stats)
+                    "upcoming" -> UpcomingCard(prefs)
+                    "music" -> MusicCard()
+                    "frequent" -> FrequentCard(
+                        apps = frequent,
+                        prefs = prefs,
+                        onLaunch = onLaunch,
+                        moving = moving,
+                        canUp = visible.indexOf("frequent") > 0,
+                        canDown = visible.indexOf("frequent") < visible.lastIndex,
+                        onStartMove = { moving = true },
+                        onUp = { move("frequent", -1) },
+                        onDown = { move("frequent", 1) },
+                        onDone = { moving = false }
                     )
+                    "note" -> Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .glass(RoundedCornerShape(24.dp))
+                            .clickable { onAction("widgets") }
+                            .padding(14.dp)
+                    ) {
+                        Text("NOTE", color = TextMuted, fontSize = 10.sp, letterSpacing = 2.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            prefs.note.trim(), color = TextPrimary, fontSize = 14.sp,
+                            maxLines = 3, overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }
@@ -242,33 +294,33 @@ private fun WeatherCard(prefs: NovaPrefs, onPutPref: (String, String) -> Unit) {
 
     Column(
         Modifier
-            .width(122.dp)
-            .glass(RoundedCornerShape(22.dp))
+            .width(96.dp)
+            .glass(RoundedCornerShape(20.dp))
             .clickable {
                 if (!granted) launcher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
                 else if (!busy) scope.launch { refresh() }
             }
-            .padding(12.dp)
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (weather != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(weather.emoji, fontSize = 28.sp)
-                Spacer(Modifier.width(6.dp))
-                Text("${weather.temp}°", color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Light)
+                Text(weather.emoji, fontSize = 22.sp)
+                Spacer(Modifier.width(4.dp))
+                Text("${weather.temp}°", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Light)
             }
-            Spacer(Modifier.height(6.dp))
-            Text(weather.place, color = TextPrimary, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(weather.label, color = TextMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(2.dp))
+            Text(weather.place, color = TextMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else {
-            Text("🌤️", fontSize = 28.sp)
-            Spacer(Modifier.height(6.dp))
+            Text("🌤️", fontSize = 22.sp)
+            Spacer(Modifier.height(2.dp))
             Text(
                 when {
-                    !granted -> "Tap to show weather"
+                    !granted -> "Show weather"
                     busy -> "Loading…"
-                    else -> "Weather unavailable"
+                    else -> "Unavailable"
                 },
-                color = TextMuted, fontSize = 12.sp
+                color = TextMuted, fontSize = 11.sp, maxLines = 1
             )
         }
     }
@@ -588,19 +640,63 @@ private fun MusicCard() {
 // ---------- Frequently used ----------
 
 @Composable
-private fun FrequentCard(apps: List<AppInfo>, prefs: NovaPrefs, onLaunch: (AppInfo) -> Unit) {
+private fun MoveChip(label: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(GlassFill)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = if (enabled) TextPrimary else TextMuted, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun FrequentCard(
+    apps: List<AppInfo>,
+    prefs: NovaPrefs,
+    onLaunch: (AppInfo) -> Unit,
+    moving: Boolean,
+    canUp: Boolean,
+    canDown: Boolean,
+    onStartMove: () -> Unit,
+    onUp: () -> Unit,
+    onDown: () -> Unit,
+    onDone: () -> Unit
+) {
     if (apps.isEmpty()) return
+    val accent = LocalAccent.current
     val iconSize = prefs.iconSize.coerceIn(44, 60)
-    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp)).padding(vertical = 12.dp, horizontal = 8.dp)) {
-        Text(
-            "FREQUENTLY USED", color = TextMuted, fontSize = 10.sp, letterSpacing = 2.sp,
-            modifier = Modifier.padding(start = 8.dp)
-        )
-        Spacer(Modifier.height(10.dp))
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .glass(shape)
+            .then(if (moving) Modifier.border(1.5.dp, accent, shape) else Modifier)
+            .pointerInput(Unit) { detectTapGestures(onLongPress = { onStartMove() }) }
+            .padding(vertical = 14.dp, horizontal = 8.dp)
+    ) {
+        if (moving) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("MOVE ROW", color = accent, fontSize = 10.sp, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
+                MoveChip("▲", canUp, onUp)
+                Spacer(Modifier.width(6.dp))
+                MoveChip("▼", canDown, onDown)
+                Spacer(Modifier.width(6.dp))
+                MoveChip("Done", true, onDone)
+            }
+        }
         Row(Modifier.fillMaxWidth()) {
             apps.forEach { app ->
                 Column(
-                    Modifier.weight(1f).bounceClick { onLaunch(app) },
+                    Modifier.weight(1f).bounceClick(onLongClick = onStartMove) {
+                        if (moving) onDone() else onLaunch(app)
+                    },
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     NovaIcon(app, iconSize.dp, prefs.iconShape)
