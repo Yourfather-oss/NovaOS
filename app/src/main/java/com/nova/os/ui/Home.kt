@@ -79,7 +79,8 @@ fun HomeScreen(
     editing: Boolean,
     onEditingChange: (Boolean) -> Unit,
     onSaveLayout: (ClassicLayout) -> Unit,
-    searchSignal: Int
+    searchSignal: Int,
+    onPutPref: (String, String) -> Unit
 ) {
     val context = LocalContext.current
     val accent = LocalAccent.current
@@ -144,60 +145,20 @@ fun HomeScreen(
         else -> "GOOD EVENING"
     }
 
-    // Clock and widgets: the top of the NOVA home, and page 0 in classic mode.
+    // Clock and widgets: the NOVA home page, and page 0 in classic mode.
     val infoBlock: @Composable () -> Unit = {
-        Column(Modifier.fillMaxWidth()) {
-            Text(greeting, color = accent, fontSize = 12.sp, letterSpacing = 4.sp)
-            Spacer(Modifier.height(4.dp))
-            BasicText(
-                time,
-                style = TextStyle(
-                    brush = Brush.horizontalGradient(listOf(TextPrimary, TextPrimary, accent)),
-                    fontSize = clockSizeSp(prefs.clockSize).sp,
-                    fontWeight = clockWeight(prefs.clockWeight),
-                    fontFamily = clockFamily(prefs.clockFont)
-                )
-            )
-            Text(date, color = TextMuted, fontSize = 16.sp, letterSpacing = 1.sp)
-            if (timerText != null) {
-                Spacer(Modifier.height(4.dp))
-                Text("FOCUS  $timerText", color = accent, fontSize = 12.sp, letterSpacing = 3.sp)
-            }
-            Spacer(Modifier.height(36.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(
-                    if (stats.charging) "Charging" else "Battery",
-                    "${stats.battery}%", stats.battery / 100f, Modifier.weight(1f)
-                )
-                StatCard("Storage", "${stats.storagePct}%", stats.storagePct / 100f, Modifier.weight(1f))
-                StatCard("Memory", "${stats.ramPct}%", stats.ramPct / 100f, Modifier.weight(1f))
-            }
-            if (recent.isNotEmpty()) {
-                Spacer(Modifier.height(14.dp))
-                Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp)).padding(14.dp)) {
-                    Text("RECENT", color = TextMuted, fontSize = 10.sp, letterSpacing = 2.sp)
-                    Spacer(Modifier.height(10.dp))
-                    IconRow(recent, prefs.iconShape, onLaunch)
-                }
-            }
-            if (prefs.note.isNotBlank()) {
-                Spacer(Modifier.height(14.dp))
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .glass(RoundedCornerShape(22.dp))
-                        .clickable { onAction("widgets") }
-                        .padding(14.dp)
-                ) {
-                    Text("NOTE", color = TextMuted, fontSize = 10.sp, letterSpacing = 2.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        prefs.note.trim(), color = TextPrimary, fontSize = 14.sp,
-                        maxLines = 3, overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
+        HomeInfo(
+            prefs = prefs,
+            now = now,
+            stats = stats,
+            timerText = timerText,
+            allApps = allApps,
+            dock = dock,
+            recent = recent,
+            onLaunch = launchAndClear,
+            onAction = onAction,
+            onPutPref = onPutPref
+        )
     }
 
     Box(
@@ -265,7 +226,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize().padding(top = 8.dp, bottom = (prefs.iconSize + 128).dp)
             )
         } else {
-            Box(Modifier.align(Alignment.TopStart).padding(top = 56.dp)) { infoBlock() }
+            Box(Modifier.fillMaxSize().padding(top = 36.dp, bottom = (prefs.iconSize + 128).dp)) { infoBlock() }
         }
 
         if (searching) {

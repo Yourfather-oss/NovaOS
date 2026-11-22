@@ -263,7 +263,8 @@ fun NovaApp(homeSignal: Int) {
                         editing = editingPages,
                         onEditingChange = { editingPages = it },
                         onSaveLayout = ::saveLayout,
-                        searchSignal = searchSignal
+                        searchSignal = searchSignal,
+                        onPutPref = { k, v -> scope.launch { store.put(k, v) } }
                     )
                 }
             }

@@ -9,7 +9,6 @@ import com.nova.os.data.ThemePreset
 import com.nova.os.data.AppInfo
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -140,6 +139,17 @@ fun DesignStudioScreen(
             Spacer(Modifier.height(12.dp))
             StudioButton("Edit home pages") { onEditPages() }
         }
+
+        Spacer(Modifier.height(28.dp))
+        Label("HOME WIDGETS")
+        ToggleRow("Weather", prefs.homeWeather) { scope.launch { store.put("w_weather", it) } }
+        ToggleRow("System rings", prefs.homeStats) { scope.launch { store.put("w_stats", it) } }
+        ToggleRow("Upcoming today", prefs.homeUpcoming) { scope.launch { store.put("w_upcoming", it) } }
+        ToggleRow("Music player", prefs.homeMusic) { scope.launch { store.put("w_music", it) } }
+        ToggleRow("Frequently used apps", prefs.homeFrequent) { scope.launch { store.put("w_frequent", it) } }
+        ToggleRow("Note card", prefs.homeNote) { scope.launch { store.put("w_note", it) } }
+        Spacer(Modifier.height(4.dp))
+        Text("If the screen is too short for everything, NOVA hides the lowest-priority widgets automatically.", color = TextMuted, fontSize = 12.sp)
 
         Spacer(Modifier.height(28.dp))
         Label("DOCK STYLE")

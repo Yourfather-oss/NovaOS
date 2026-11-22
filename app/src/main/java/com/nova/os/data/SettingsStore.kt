@@ -45,7 +45,14 @@ data class NovaPrefs(
     val aiKey: String = "",
     val aiModel: String = "claude-haiku-5-5",
     val wallpaperDim: Int = 35,
-    val wallpaperRev: Long = 0L
+    val wallpaperRev: Long = 0L,
+    val weather: String = "",
+    val homeWeather: Boolean = true,
+    val homeStats: Boolean = true,
+    val homeUpcoming: Boolean = true,
+    val homeMusic: Boolean = true,
+    val homeFrequent: Boolean = true,
+    val homeNote: Boolean = true
 )
 
 class SettingsStore(private val context: Context) {
@@ -100,7 +107,14 @@ class SettingsStore(private val context: Context) {
             aiKey = p[stringPreferencesKey("ai_key")] ?: "",
             aiModel = p[stringPreferencesKey("ai_model")] ?: "claude-haiku-5-5",
             wallpaperDim = p[intPreferencesKey("wallpaper_dim")] ?: 35,
-            wallpaperRev = p[stringPreferencesKey("wallpaper_rev")]?.toLongOrNull() ?: 0L
+            wallpaperRev = p[stringPreferencesKey("wallpaper_rev")]?.toLongOrNull() ?: 0L,
+            weather = p[stringPreferencesKey("weather")] ?: "",
+            homeWeather = p[booleanPreferencesKey("w_weather")] ?: true,
+            homeStats = p[booleanPreferencesKey("w_stats")] ?: true,
+            homeUpcoming = p[booleanPreferencesKey("w_upcoming")] ?: true,
+            homeMusic = p[booleanPreferencesKey("w_music")] ?: true,
+            homeFrequent = p[booleanPreferencesKey("w_frequent")] ?: true,
+            homeNote = p[booleanPreferencesKey("w_note")] ?: true
         )
     }
 
@@ -140,6 +154,8 @@ class SettingsStore(private val context: Context) {
         it[clockFontKey] = t.clockFont
         it[clockWeightKey] = t.clockWeight
     }
+
+    suspend fun put(key: String, value: Boolean) = context.novaStore.edit { it[booleanPreferencesKey(key)] = value }
 
     suspend fun put(key: String, value: String) = context.novaStore.edit { it[stringPreferencesKey(key)] = value }
 
