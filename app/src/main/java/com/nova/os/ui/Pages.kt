@@ -97,7 +97,7 @@ fun IconRow(apps: List<AppInfo>, iconShape: String, onLaunch: (AppInfo) -> Unit)
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+internal fun Section(title: String, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp)).padding(16.dp)) {
         Text(title, color = TextMuted, fontSize = 11.sp, letterSpacing = 3.sp)
         Spacer(Modifier.height(12.dp))
@@ -106,7 +106,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun PillButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+internal fun PillButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier
             .height(48.dp)
@@ -179,77 +179,3 @@ fun DashboardScreen(
 }
 
 // ---------- Widget space (swipe right on home) ----------
-
-@Composable
-fun WidgetsScreen(
-    note: String,
-    onNote: (String) -> Unit,
-    timerLeft: Int,
-    timerRunning: Boolean,
-    timerPreset: Int,
-    onTimerToggle: () -> Unit,
-    onTimerReset: () -> Unit,
-    onTimerPreset: (Int) -> Unit,
-    onClose: () -> Unit
-) {
-    val accent = LocalAccent.current
-    var text by remember { mutableStateOf(note) }
-    LaunchedEffect(text) {
-        delay(500)
-        if (text != note) onNote(text)
-    }
-
-    Column(
-        pageModifier()
-            .blockTouches()
-            .horizontalSwipe(onSwipeLeft = onClose)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp)
-    ) {
-        Text("NOVA WIDGETS", color = accent, fontSize = 12.sp, letterSpacing = 4.sp)
-        Spacer(Modifier.height(20.dp))
-
-        Section("QUICK NOTE") {
-            BasicTextField(
-                value = text,
-                onValueChange = { text = it },
-                textStyle = TextStyle(color = TextPrimary, fontSize = 16.sp),
-                cursorBrush = SolidColor(accent),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp),
-                decorationBox = { inner ->
-                    Box {
-                        if (text.isEmpty()) Text("Jot something down…", color = TextMuted, fontSize = 16.sp)
-                        inner()
-                    }
-                }
-            )
-        }
-
-        Spacer(Modifier.height(14.dp))
-        Section("FOCUS TIMER") {
-            val m = timerLeft / 60
-            val s = timerLeft % 60
-            Text(
-                "%02d:%02d".format(m, s),
-                color = if (timerRunning) accent else TextPrimary,
-                fontSize = 56.sp, fontWeight = FontWeight.Thin
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf(5, 15, 25).forEach { minutes ->
-                    OptionChip("$minutes min", timerPreset == minutes) { onTimerPreset(minutes) }
-                }
-            }
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PillButton(if (timerRunning) "Pause" else "Start", Modifier.weight(1f), onTimerToggle)
-                PillButton("Reset", Modifier.weight(1f), onTimerReset)
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-        Text("Swipe left to go back", color = TextMuted, fontSize = 11.sp, letterSpacing = 2.sp)
-    }
-}

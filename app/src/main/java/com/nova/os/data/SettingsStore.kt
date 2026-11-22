@@ -39,7 +39,11 @@ data class NovaPrefs(
     val classicUnplaced: List<String> = emptyList(),
     val gridPreset: String = "4x5",
     val dockStyle: String = "floating",
-    val iconFinish: String = "glass"
+    val iconFinish: String = "glass",
+    val tasks: List<Task> = emptyList(),
+    val focusLog: List<Long> = emptyList(),
+    val aiKey: String = "",
+    val aiModel: String = "claude-haiku-5-5"
 )
 
 class SettingsStore(private val context: Context) {
@@ -88,7 +92,11 @@ class SettingsStore(private val context: Context) {
             classicUnplaced = (p[stringPreferencesKey("classic_unplaced")] ?: "").split(",").filter { it.isNotBlank() },
             gridPreset = p[stringPreferencesKey("grid_preset")] ?: "4x5",
             dockStyle = p[stringPreferencesKey("dock_style")] ?: "floating",
-            iconFinish = p[stringPreferencesKey("icon_finish")] ?: "glass"
+            iconFinish = p[stringPreferencesKey("icon_finish")] ?: "glass",
+            tasks = decodeTasks(p[stringPreferencesKey("tasks")]),
+            focusLog = (p[stringPreferencesKey("focus_log")] ?: "").split(",").mapNotNull { it.toLongOrNull() },
+            aiKey = p[stringPreferencesKey("ai_key")] ?: "",
+            aiModel = p[stringPreferencesKey("ai_model")] ?: "claude-haiku-5-5"
         )
     }
 
@@ -122,6 +130,16 @@ class SettingsStore(private val context: Context) {
     suspend fun setClassicLayout(pages: List<List<String>>, unplaced: List<String>) = context.novaStore.edit {
         it[stringPreferencesKey("classic_pages")] = encodePages(pages)
         it[stringPreferencesKey("classic_unplaced")] = unplaced.joinToString(",")
+    }
+
+    suspend fun setTasks(tasks: List<Task>) = context.novaStore.edit {
+        it[stringPreferencesKey("tasks")] = encodeTasks(tasks)
+    }
+
+    suspend fun logFocus() = context.novaStore.edit { p ->
+        val key = stringPreferencesKey("focus_log")
+        val current = (p[key] ?: "").split(",").filter { it.isNotBlank() }
+        p[key] = (current + System.currentTimeMillis().toString()).takeLast(200).joinToString(",")
     }
 
     suspend fun logLaunch(packageName: String) = context.novaStore.edit { p ->

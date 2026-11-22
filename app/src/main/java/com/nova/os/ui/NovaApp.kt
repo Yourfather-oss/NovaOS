@@ -80,7 +80,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nova.os.Reminders
 import com.nova.os.data.AppInfo
+import com.nova.os.data.Task
 import com.nova.os.data.ClassicLayout
 import com.nova.os.data.NovaPrefs
 import com.nova.os.data.SettingsStore
@@ -189,12 +191,37 @@ fun NovaApp(homeSignal: Int) {
     var timerPreset by remember { mutableIntStateOf(25) }
     var timerLeft by remember { mutableIntStateOf(25 * 60) }
     var timerRunning by remember { mutableStateOf(false) }
+    var focusTitle by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(timerRunning) {
+        if (!timerRunning) return@LaunchedEffect
         while (timerRunning && timerLeft > 0) {
             delay(1000)
             timerLeft--
         }
-        if (timerLeft <= 0) timerRunning = false
+        if (timerLeft <= 0) {
+            timerRunning = false
+            scope.launch { store.logFocus() }
+            Reminders.notifyNow(
+                context, 9001, "Focus session complete",
+                focusTitle ?: "Nice work. Take a short break."
+            )
+            focusTitle = null
+        }
+    }
+
+    fun saveTasks(next: List<Task>) {
+        val now = System.currentTimeMillis()
+        prefs.tasks
+            .filter { old -> next.none { it.id == old.id && !it.done } }
+            .forEach { Reminders.cancel(context, it.id) }
+        next.filter { !it.done && (it.due ?: 0L) > now }.forEach { Reminders.schedule(context, it) }
+        scope.launch { store.setTasks(next) }
+    }
+
+    // Re-arm reminders after a restart or update.
+    LaunchedEffect(prefs.tasks) {
+        val now = System.currentTimeMillis()
+        prefs.tasks.filter { !it.done && (it.due ?: 0L) > now }.forEach { Reminders.schedule(context, it) }
     }
     val timerText = if (timerRunning) "%02d:%02d".format(timerLeft / 60, timerLeft % 60) else null
 
@@ -297,17 +324,31 @@ fun NovaApp(homeSignal: Int) {
                 exit = slideOutHorizontally(tween(ms(300))) { -it } + fadeOut(tween(ms(250)))
             ) {
                 WidgetsScreen(
-                    note = prefs.note,
+                    prefs = prefs,
                     onNote = { scope.launch { store.setNote(it) } },
                     timerLeft = timerLeft,
                     timerRunning = timerRunning,
                     timerPreset = timerPreset,
+                    timerLabel = focusTitle,
                     onTimerToggle = {
                         if (!timerRunning && timerLeft <= 0) timerLeft = timerPreset * 60
                         timerRunning = !timerRunning
                     },
-                    onTimerReset = { timerRunning = false; timerLeft = timerPreset * 60 },
-                    onTimerPreset = { timerPreset = it; timerRunning = false; timerLeft = it * 60 },
+                    onTimerReset = { timerRunning = false; timerLeft = timerPreset * 60; focusTitle = null },
+                    onTimerPreset = { timerPreset = it; timerRunning = false; timerLeft = it * 60; focusTitle = null },
+                    onTasksChange = ::saveTasks,
+                    onFocusTask = { task ->
+                        focusTitle = task.title
+                        timerPreset = 25
+                        timerLeft = 25 * 60
+                        timerRunning = true
+                    },
+                    onAiSettings = { key, model ->
+                        scope.launch {
+                            store.put("ai_key", key)
+                            store.put("ai_model", model)
+                        }
+                    },
                     onClose = { screen = Screen.Home }
                 )
             }
