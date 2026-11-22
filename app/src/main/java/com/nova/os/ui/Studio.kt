@@ -9,6 +9,7 @@ import com.nova.os.data.ThemePreset
 import com.nova.os.data.AppInfo
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
