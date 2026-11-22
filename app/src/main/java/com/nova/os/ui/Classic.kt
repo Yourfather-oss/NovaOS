@@ -1,5 +1,6 @@
 package com.nova.os.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +48,7 @@ private fun letterOf(app: AppInfo): String =
     app.label.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() }?.toString() ?: "#"
 
 /** Classic mode: every app lives on the home screen, spread over automatically created pages. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ClassicHome(
     pages: List<List<AppInfo>>,
