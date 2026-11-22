@@ -1,9 +1,12 @@
 package com.nova.os
 
 import android.service.notification.NotificationListenerService
+import android.service.notification.StatusBarNotification
+import com.nova.os.data.MessageIntelligenceStore
 
-/**
- * Enabling notification access for NOVA lets it read which media is playing, so the home
- * music card can show the track and control playback. NOVA does not store notifications.
- */
-class NovaNotificationListener : NotificationListenerService()
+/** Retains existing notification-listener capability and captures WhatsApp only after opt-in. */
+class NovaNotificationListener : NotificationListenerService() {
+    override fun onNotificationPosted(sbn: StatusBarNotification) {
+        MessageIntelligenceStore.capture(this, sbn)
+    }
+}

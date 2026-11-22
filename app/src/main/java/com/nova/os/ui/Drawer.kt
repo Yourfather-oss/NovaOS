@@ -201,6 +201,7 @@ fun DrawerScreen(
     iconShape: String,
     iconSize: Int,
     showLabels: Boolean,
+    launchLog: List<Pair<String, Long>>,
     onToggleDock: (AppInfo) -> Unit,
     onLaunch: (AppInfo) -> Unit,
     onHide: (AppInfo) -> Unit,
@@ -217,6 +218,7 @@ fun DrawerScreen(
         listOf("All") + categoryOrder.filter { c -> apps.any { it.category == c } }
     }
     val searching = query.isNotBlank()
+    val frequent = remember(launchLog, apps) { frequentApps(launchLog, apps, 4) }
     val filtered = remember(apps, query, category) {
         when {
             searching -> apps.filter { it.label.contains(query, ignoreCase = true) }
@@ -255,25 +257,6 @@ fun DrawerScreen(
                 .clickable { onClose() }
         )
         Spacer(Modifier.height(16.dp))
-        BasicTextField(
-            value = query,
-            onValueChange = { query = it },
-            singleLine = true,
-            textStyle = TextStyle(color = TextPrimary, fontSize = 16.sp),
-            cursorBrush = SolidColor(accent),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .glass(RoundedCornerShape(26.dp)),
-            decorationBox = { inner ->
-                Box(Modifier.padding(horizontal = 20.dp), contentAlignment = Alignment.CenterStart) {
-                    if (query.isEmpty()) Text("Search apps, settings, maths, web", color = TextMuted, fontSize = 16.sp)
-                    inner()
-                }
-            }
-        )
-        Spacer(Modifier.height(10.dp))
-
         if (!searching) {
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -284,7 +267,7 @@ fun DrawerScreen(
             Spacer(Modifier.height(4.dp))
         }
 
-        LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (searching) {
                 if (calc != null) {
                     item(key = "calc", span = { GridItemSpan(maxLineSpan) }) {
@@ -350,6 +333,37 @@ fun DrawerScreen(
                 }
             }
         }
+
+        if (!searching && frequent.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp)).padding(horizontal = 18.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                frequent.forEach { app ->
+                    Box(Modifier.clickable { onLaunch(app) }, contentAlignment = Alignment.Center) {
+                        NovaIcon(app, 48.dp, iconShape)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+        BasicTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            textStyle = TextStyle(color = TextPrimary, fontSize = 16.sp),
+            cursorBrush = SolidColor(accent),
+            modifier = Modifier.fillMaxWidth().height(52.dp).glass(RoundedCornerShape(26.dp)),
+            decorationBox = { inner ->
+                Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (query.isEmpty()) Text("Search apps, settings, maths, web", color = TextMuted, fontSize = 16.sp)
+                    inner()
+                }
+            }
+        )
     }
 }
 

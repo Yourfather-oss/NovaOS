@@ -282,6 +282,7 @@ fun NovaApp(homeSignal: Int) {
                     iconShape = prefs.iconShape,
                     iconSize = prefs.iconSize,
                     showLabels = prefs.showLabels,
+                    launchLog = prefs.launchLog,
                     onToggleDock = ::toggleDock,
                     onLaunch = ::launchTracked,
                     onHide = ::hideApp,
@@ -345,10 +346,11 @@ fun NovaApp(homeSignal: Int) {
                         timerLeft = 25 * 60
                         timerRunning = true
                     },
-                    onAiSettings = { key, model ->
+                    onAiSettings = { endpoint, model ->
                         scope.launch {
-                            store.put("ai_key", key)
+                            store.put("ai_endpoint", endpoint)
                             store.put("ai_model", model)
+                            store.put("ai_key", "") // clear any legacy on-device Claude key
                         }
                     },
                     onClose = { screen = Screen.Home }

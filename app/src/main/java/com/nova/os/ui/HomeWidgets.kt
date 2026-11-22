@@ -145,7 +145,8 @@ fun HomeInfo(
             "music" to 96,
             "note" to 92
         )
-        val pinned = prefs.frequentPos == "bottom" && enabled["frequent"] == true
+        // Frequently used apps remain a normal widget, never a dock/pinned strip.
+        val pinned = false
         var used = 150.dp + if (timerText != null) 18.dp else 0.dp
         if (pinned) used += ((heights["frequent"] ?: 104) + 14).dp
         val show = mutableSetOf<String>()
@@ -696,15 +697,13 @@ private fun FrequentCard(
                 Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(if (pinned) "PINNED ABOVE SEARCH" else "MOVE ROW", color = accent, fontSize = 10.sp, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
+                Text("MOVE ROW", color = accent, fontSize = 10.sp, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
                 if (!pinned) {
                     MoveChip("▲", canUp, onUp)
                     Spacer(Modifier.width(6.dp))
                     MoveChip("▼", canDown, onDown)
                     Spacer(Modifier.width(6.dp))
                 }
-                MoveChip(if (pinned) "Unpin" else "Pin ↓", true, onTogglePin)
-                Spacer(Modifier.width(6.dp))
                 MoveChip("Done", true, onDone)
             }
         }

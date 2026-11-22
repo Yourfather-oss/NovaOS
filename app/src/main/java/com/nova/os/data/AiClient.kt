@@ -12,14 +12,15 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/** Chat messages exchanged with NOVA Intelligence. */
 data class AiMessage(val role: String, val text: String)
 data class ProposedTask(val title: String, val whenText: String?)
 data class AiReply(val reply: String, val tasks: List<ProposedTask>)
 
 private val stamp = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
-const val MODEL_FAST = "claude-haiku-5-5"
-const val MODEL_SMART = "claude-sonnet-5-5"
+/** Balanced model is configurable on the managed backend; this is its default. */
+const val MODEL_BALANCED = "gpt-6.2-sol"
 
 fun buildSystemPrompt(now: LocalDateTime, tasks: List<Task>, focusToday: Int): String {
     val zone = ZoneId.systemDefault()
@@ -31,76 +32,64 @@ fun buildSystemPrompt(now: LocalDateTime, tasks: List<Task>, focusToday: Int): S
         .joinToString("\n") { "- " + it.title }
         .ifBlank { "none" }
     return listOf(
-        "You are NOVA, the personal assistant built into the user's Android launcher.",
-        "Be concise, practical and warm. Never invent commitments the user did not mention.",
+        "You are NOVA Intelligence, the personal assistant built into the user's Android launcher.",
+        "Be concise, practical, warm and proactive without being pushy. Never invent commitments, calendar events or completed actions.",
         "Current local date and time: ${now.format(stamp)} (${now.dayOfWeek}).",
         "Focus sessions completed today: $focusToday.",
-        "",
-        "Open tasks:",
-        open,
-        "",
-        "Recently completed:",
-        done,
-        "",
-        "Reply with ONLY a JSON object, with no markdown, in exactly this shape:",
-        "{\"reply\": \"your message to the user\", \"tasks\": [{\"title\": \"short task title\", \"when\": \"yyyy-MM-dd HH:mm or null\"}]}",
-        "Put in \"tasks\" only NEW tasks the user asked you to add or plan, otherwise use an empty list.",
-        "Resolve words like tomorrow from the current date. Space tasks realistically and avoid clashing with open tasks.",
-        "The user approves tasks before they are added, so never claim they were already added."
+        "Open tasks:", open,
+        "Recently completed:", done,
+        "Return ONLY valid JSON in this shape: {\"reply\":\"message\",\"tasks\":[{\"title\":\"task\",\"when\":\"yyyy-MM-dd HH:mm or null\"}]}",
+        "Only include new tasks the user explicitly asked you to create or clearly requested as part of a plan. Otherwise return an empty tasks array.",
+        "Resolve relative dates using the supplied local date and time. Do not claim a task or reminder has been saved: the user must approve proposed tasks first.",
+        "You cannot read the phone calendar or operate Android apps unless the app supplies that information or a future approved device action. Be honest about this limitation."
     ).joinToString("\n")
 }
 
-/** Calls the Anthropic Messages API directly from the phone with the user's own key. */
-suspend fun askClaude(
-    apiKey: String,
+/** Sends requests to the user's managed NOVA backend. The OpenAI key never lives in the APK. */
+suspend fun askNOVA(
+    endpoint: String,
     model: String,
     system: String,
     messages: List<AiMessage>
 ): Result<String> = withContext(Dispatchers.IO) {
     var conn: HttpURLConnection? = null
     try {
-        val msgs = JSONArray()
-        messages.forEach { msgs.put(JSONObject().put("role", it.role).put("content", it.text)) }
+        require(endpoint.startsWith("https://")) { "Use your secure HTTPS NOVA backend URL." }
+        val history = JSONArray()
+        messages.takeLast(12).forEach { history.put(JSONObject().put("role", it.role).put("content", it.text)) }
         val body = JSONObject()
-            .put("model", model)
-            .put("max_tokens", 2048)
-            .put("system", system)
-            .put("messages", msgs)
+            .put("model", model.ifBlank { MODEL_BALANCED })
+            .put("instructions", system)
+            .put("messages", history)
 
-        conn = (URL("https://api.anthropic.com/v1/messages").openConnection() as HttpURLConnection).apply {
+        conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15000
             readTimeout = 60000
             doOutput = true
-            setRequestProperty("content-type", "application/json")
-            setRequestProperty("x-api-key", apiKey)
-            setRequestProperty("anthropic-version", "2023-06-01")
+            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("Accept", "application/json")
         }
-        conn.outputStream.use { it.write(body.toString().toByteArray()) }
-
+        conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
         val code = conn.responseCode
         val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-        val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-
+        val payload = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
         if (code !in 200..299) {
-            val apiMessage = runCatching { JSONObject(text).optJSONObject("error")?.optString("message") }.getOrNull()
-            val msg = when (code) {
-                401 -> "That API key was rejected. Check it in the Ask NOVA settings."
-                429 -> "Rate limit reached. Try again shortly."
-                else -> apiMessage?.takeIf { it.isNotBlank() } ?: "Request failed ($code)."
+            val detail = runCatching { JSONObject(payload).optString("error") }.getOrNull().orEmpty()
+            val message = when (code) {
+                401, 403 -> "NOVA backend authentication failed. Check its deployment settings."
+                429 -> "NOVA is receiving too many requests. Try again shortly."
+                502, 503 -> "The GPT service is temporarily unavailable. Try again shortly."
+                else -> detail.ifBlank { "NOVA backend request failed ($code)." }
             }
-            return@withContext Result.failure(IllegalStateException(msg))
+            return@withContext Result.failure(IllegalStateException(message))
         }
-
-        val content = JSONObject(text).getJSONArray("content")
-        val sb = StringBuilder()
-        for (i in 0 until content.length()) {
-            val block = content.getJSONObject(i)
-            if (block.optString("type") == "text") sb.append(block.optString("text"))
-        }
-        Result.success(sb.toString())
+        val result = JSONObject(payload)
+        val answer = result.optString("text").ifBlank { result.optString("output_text") }
+        if (answer.isBlank()) Result.failure(IllegalStateException("The NOVA backend returned an empty reply."))
+        else Result.success(answer)
     } catch (e: IOException) {
-        Result.failure(IllegalStateException("Couldn't reach Anthropic. Check your internet connection."))
+        Result.failure(IllegalStateException("Couldn't reach your NOVA backend. Check the URL and internet connection."))
     } catch (e: Exception) {
         Result.failure(e)
     } finally {
@@ -128,7 +117,7 @@ fun parseAiReply(raw: String): AiReply {
     return AiReply(raw.trim(), emptyList())
 }
 
-/** Parses "yyyy-MM-dd HH:mm" in local time. */
+/** Parses yyyy-MM-dd HH:mm in the device's local time zone. */
 fun parseWhen(text: String?): Long? {
     if (text.isNullOrBlank()) return null
     return runCatching {

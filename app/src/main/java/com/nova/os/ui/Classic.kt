@@ -140,10 +140,21 @@ fun ClassicHome(
             } else {
                 val pageIdx = index - 1
                 val pagePkgs = layout.pages.getOrNull(pageIdx).orEmpty()
-                Box(Modifier.fillMaxSize()) {
-                    Column(Modifier.fillMaxSize()) {
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    // Compact app field: preserve all five columns while keeping
+                    // the app grid within roughly 78% of the available page height.
+                    val rowGap = 8.dp
+                    val availableGridHeight = maxHeight * 0.78f
+                    val compactCellHeight = minOf(
+                        (availableGridHeight - rowGap * (grid.rows - 1)) / grid.rows,
+                        (prefs.iconSize + if (prefs.showLabels) 28 else 12).coerceIn(68, 92).dp
+                    ).coerceAtLeast(64.dp)
+                    Column(
+                        Modifier.fillMaxWidth().height(compactCellHeight * grid.rows + rowGap * (grid.rows - 1)),
+                        verticalArrangement = Arrangement.spacedBy(rowGap)
+                    ) {
                         for (r in 0 until grid.rows) {
-                            Row(Modifier.fillMaxWidth().weight(1f)) {
+                            Row(Modifier.fillMaxWidth().height(compactCellHeight)) {
                                 for (c in 0 until grid.cols) {
                                     val pkg = pagePkgs.getOrNull(r * grid.cols + c)
                                     val app = pkg?.let { appsByPkg[it] }
@@ -224,27 +235,6 @@ fun ClassicHome(
             }
         }
 
-        val rangeText = if (current == 0) "HOME" else {
-            val page = layout.pages.getOrNull(current - 1).orEmpty().mapNotNull { appsByPkg[it] }
-            if (page.isEmpty()) "EMPTY" else "${letterOf(page.first())} – ${letterOf(page.last())}"
-        }
-        Column(
-            Modifier.fillMaxWidth().padding(top = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(rangeText, color = TextMuted, fontSize = 10.sp, letterSpacing = 2.sp)
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                for (i in 0..layout.pages.size) {
-                    Box(
-                        Modifier
-                            .size(if (i == current) 8.dp else 6.dp)
-                            .clip(CircleShape)
-                            .background(if (i == current) accent else GlassBorder)
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -297,10 +287,6 @@ private fun ClassicCell(
             }
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            DropdownMenuItem(
-                text = { Text(if (pinned) "Remove from dock" else "Add to dock") },
-                onClick = { menu = false; onToggleDock(app) }
-            )
             DropdownMenuItem(text = { Text("Edit pages") }, onClick = { menu = false; onEdit() })
             DropdownMenuItem(text = { Text("App info") }, onClick = { menu = false; openAppInfo(context, app) })
             DropdownMenuItem(text = { Text("Hide app") }, onClick = { menu = false; onHide(app) })

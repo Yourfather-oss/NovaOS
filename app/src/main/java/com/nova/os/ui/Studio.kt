@@ -148,9 +148,6 @@ fun DesignStudioScreen(
         ToggleRow("Upcoming today", prefs.homeUpcoming) { scope.launch { store.put("w_upcoming", it) } }
         ToggleRow("Music player", prefs.homeMusic) { scope.launch { store.put("w_music", it) } }
         ToggleRow("Frequently used apps", prefs.homeFrequent) { scope.launch { store.put("w_frequent", it) } }
-        ToggleRow("Pin frequently used just above search", prefs.frequentPos == "bottom") {
-            scope.launch { store.put("frequent_pos", if (it) "bottom" else "list") }
-        }
         ToggleRow("Note card", prefs.homeNote) { scope.launch { store.put("w_note", it) } }
         Spacer(Modifier.height(4.dp))
         Spacer(Modifier.height(20.dp))
