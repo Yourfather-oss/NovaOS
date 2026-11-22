@@ -1,6 +1,13 @@
 package com.nova.os.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -71,7 +78,8 @@ fun HomeScreen(
     homeSignal: Int,
     editing: Boolean,
     onEditingChange: (Boolean) -> Unit,
-    onSaveLayout: (ClassicLayout) -> Unit
+    onSaveLayout: (ClassicLayout) -> Unit,
+    searchSignal: Int
 ) {
     val context = LocalContext.current
     val accent = LocalAccent.current
@@ -81,6 +89,25 @@ fun HomeScreen(
     val classic = prefs.homeMode == "classic"
     val isEditing = editing && classic
     val latestEditing by rememberUpdatedState(isEditing)
+
+    // Classic mode searches in place; the A–Z drawer is only used by NOVA mode.
+    var query by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val searching = classic && query.isNotBlank()
+    LaunchedEffect(classic) { query = "" }
+    LaunchedEffect(searchSignal) {
+        if (searchSignal > 0 && classic) runCatching { focusRequester.requestFocus() }
+    }
+    BackHandler(enabled = query.isNotEmpty()) {
+        query = ""
+        focusManager.clearFocus()
+    }
+    val launchAndClear: (AppInfo) -> Unit = {
+        query = ""
+        focusManager.clearFocus()
+        onLaunch(it)
+    }
 
     val grid = gridSpec(prefs.gridPreset)
     val layout = remember(prefs.classicPages, prefs.classicUnplaced, allApps, grid) {
@@ -217,6 +244,7 @@ fun HomeScreen(
             }
             .statusBarsPadding()
             .navigationBarsPadding()
+            .imePadding()
             .padding(horizontal = 24.dp)
     ) {
         if (classic) {
@@ -229,7 +257,7 @@ fun HomeScreen(
                 editing = isEditing,
                 homePage = { Box(Modifier.fillMaxSize().padding(top = 20.dp)) { infoBlock() } },
                 dockPackages = dockPackages,
-                onLaunch = onLaunch,
+                onLaunch = launchAndClear,
                 onToggleDock = onToggleDock,
                 onHide = onHide,
                 onLayout = onSaveLayout,
@@ -240,16 +268,54 @@ fun HomeScreen(
             Box(Modifier.align(Alignment.TopStart).padding(top = 56.dp)) { infoBlock() }
         }
 
+        if (searching) {
+            InlineSearchResults(
+                query = query,
+                apps = allApps,
+                columns = grid.cols,
+                iconSize = prefs.iconSize,
+                iconShape = prefs.iconShape,
+                iconFinish = prefs.iconFinish,
+                showLabels = prefs.showLabels,
+                onLaunch = launchAndClear,
+                onDone = { query = ""; focusManager.clearFocus() },
+                modifier = Modifier.fillMaxSize().padding(top = 8.dp, bottom = 84.dp)
+            )
+        }
+
         Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .glass(RoundedCornerShape(26.dp))
-                    .clickable { onOpenDrawer() }
-                    .padding(horizontal = 20.dp),
-                contentAlignment = Alignment.CenterStart
-            ) { Text("Search apps", color = TextMuted, fontSize = 15.sp) }
+            if (classic) {
+                BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = TextStyle(color = TextPrimary, fontSize = 15.sp),
+                    cursorBrush = SolidColor(accent),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .glass(RoundedCornerShape(26.dp))
+                        .focusRequester(focusRequester),
+                    decorationBox = { inner ->
+                        Box(Modifier.padding(horizontal = 20.dp), contentAlignment = Alignment.CenterStart) {
+                            if (query.isEmpty()) {
+                                Text("Search apps, settings, maths, web", color = TextMuted, fontSize = 15.sp)
+                            }
+                            inner()
+                        }
+                    }
+                )
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .glass(RoundedCornerShape(26.dp))
+                        .clickable { onOpenDrawer() }
+                        .padding(horizontal = 20.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) { Text("Search apps", color = TextMuted, fontSize = 15.sp) }
+            }
 
             Spacer(Modifier.height(16.dp))
 
@@ -260,7 +326,7 @@ fun HomeScreen(
                 "flat" -> Modifier.fillMaxWidth().glass(RoundedCornerShape(14.dp))
                 else -> Modifier.fillMaxWidth().glass(RoundedCornerShape(30.dp))
             }
-            Row(
+            if (!searching) Row(
                 dockBase
                     .then(if (manyDock) Modifier.horizontalScroll(dockScroll) else Modifier)
                     .padding(vertical = 14.dp, horizontal = if (manyDock) 14.dp else 0.dp),
@@ -273,7 +339,8 @@ fun HomeScreen(
                 dock.forEach { app ->
                     NovaIcon(
                         app, prefs.iconSize.dp, prefs.iconShape,
-                        Modifier.bounceClick { onLaunch(app) }
+                        Modifier.bounceClick { launchAndClear(app) },
+                        finish = if (classic) prefs.iconFinish else "plain"
                     )
                 }
             }

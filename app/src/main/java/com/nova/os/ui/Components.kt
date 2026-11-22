@@ -28,6 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -78,7 +81,49 @@ fun Modifier.bounceClick(onLongClick: (() -> Unit)? = null, onClick: () -> Unit)
 fun Modifier.blockTouches(): Modifier = pointerInput(Unit) { detectTapGestures { } }
 
 @Composable
-fun NovaIcon(app: AppInfo, size: Dp, shape: String, modifier: Modifier = Modifier) {
+fun NovaIcon(
+    app: AppInfo,
+    size: Dp,
+    shape: String,
+    modifier: Modifier = Modifier,
+    finish: String = "plain"
+) {
+    if (finish == "glass" && shape != "original") {
+        // Premium glass tile: frosted plate, bright rim, specular highlight, icon floating inside.
+        val outer = if (shape == "circle") CircleShape else RoundedCornerShape(size * 0.3f)
+        val inner = if (shape == "circle") CircleShape else RoundedCornerShape(size * 0.2f)
+        Box(
+            modifier
+                .size(size)
+                .shadow(10.dp, outer, ambientColor = Color.Black, spotColor = Color.Black)
+                .clip(outer)
+                .background(Brush.linearGradient(listOf(Color(0x59FFFFFF), Color(0x14FFFFFF), Color(0x2EFFFFFF))))
+                .border(
+                    1.2.dp,
+                    Brush.linearGradient(listOf(Color(0xCCFFFFFF), Color(0x1AFFFFFF), Color(0x66FFFFFF))),
+                    outer
+                )
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            listOf(Color(0x47FFFFFF), Color.Transparent),
+                            endY = this.size.height * 0.5f
+                        ),
+                        size = Size(this.size.width, this.size.height * 0.5f)
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                bitmap = app.icon,
+                contentDescription = app.label,
+                modifier = Modifier.size(size * 0.74f).clip(inner),
+                contentScale = ContentScale.Crop
+            )
+        }
+        return
+    }
     val s = when (shape) {
         "circle" -> CircleShape
         "original" -> RoundedCornerShape(0.dp)

@@ -136,6 +136,7 @@ fun NovaApp(homeSignal: Int) {
     LaunchedEffect(homeSignal) { if (screen != Screen.Splash) screen = Screen.Home }
     BackHandler(enabled = screen != Screen.Splash && screen != Screen.Home) { screen = Screen.Home }
     var editingPages by remember { mutableStateOf(false) }
+    var searchSignal by remember { mutableIntStateOf(0) }
     BackHandler(enabled = editingPages && screen == Screen.Home) { editingPages = false }
 
     val visibleApps = remember(apps, prefs.hidden) { apps.filter { it.packageName !in prefs.hidden } }
@@ -155,7 +156,14 @@ fun NovaApp(homeSignal: Int) {
 
     fun runAction(action: String) {
         when (action) {
-            "drawer" -> screen = Screen.Drawer
+            "drawer" -> {
+                // Classic mode has no A–Z drawer: the same gesture focuses the home search instead.
+                if (prefs.homeMode == "classic") {
+                    searchSignal++
+                } else {
+                    screen = Screen.Drawer
+                }
+            }
             "control" -> screen = Screen.Control
             "dashboard" -> screen = Screen.Dashboard
             "widgets" -> screen = Screen.Widgets
@@ -227,7 +235,8 @@ fun NovaApp(homeSignal: Int) {
                         homeSignal = homeSignal,
                         editing = editingPages,
                         onEditingChange = { editingPages = it },
-                        onSaveLayout = ::saveLayout
+                        onSaveLayout = ::saveLayout,
+                        searchSignal = searchSignal
                     )
                 }
             }
@@ -238,7 +247,7 @@ fun NovaApp(homeSignal: Int) {
                 exit = fadeOut(tween(ms(500)))
             ) { SplashScreen() }
 
-            AnimatedVisibility(visible = screen == Screen.Drawer, enter = enter, exit = exit) {
+            AnimatedVisibility(visible = screen == Screen.Drawer && prefs.homeMode != "classic", enter = enter, exit = exit) {
                 DrawerScreen(
                     apps = visibleApps,
                     dockPackages = dockPackages,

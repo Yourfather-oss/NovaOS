@@ -38,7 +38,8 @@ data class NovaPrefs(
     val classicPages: List<List<String>> = emptyList(),
     val classicUnplaced: List<String> = emptyList(),
     val gridPreset: String = "4x5",
-    val dockStyle: String = "floating"
+    val dockStyle: String = "floating",
+    val iconFinish: String = "glass"
 )
 
 class SettingsStore(private val context: Context) {
@@ -86,7 +87,8 @@ class SettingsStore(private val context: Context) {
             classicPages = decodePages(p[stringPreferencesKey("classic_pages")]),
             classicUnplaced = (p[stringPreferencesKey("classic_unplaced")] ?: "").split(",").filter { it.isNotBlank() },
             gridPreset = p[stringPreferencesKey("grid_preset")] ?: "4x5",
-            dockStyle = p[stringPreferencesKey("dock_style")] ?: "floating"
+            dockStyle = p[stringPreferencesKey("dock_style")] ?: "floating",
+            iconFinish = p[stringPreferencesKey("icon_finish")] ?: "glass"
         )
     }
 

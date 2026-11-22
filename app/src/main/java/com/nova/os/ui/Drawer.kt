@@ -352,3 +352,67 @@ fun DrawerScreen(
         }
     }
 }
+
+/** Search results shown in place on the classic home screen, without the A–Z drawer. */
+@Composable
+fun InlineSearchResults(
+    query: String,
+    apps: List<AppInfo>,
+    columns: Int,
+    iconSize: Int,
+    iconShape: String,
+    iconFinish: String,
+    showLabels: Boolean,
+    onLaunch: (AppInfo) -> Unit,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    val q = query.trim()
+    val matches = remember(apps, q) { apps.filter { it.label.contains(q, ignoreCase = true) } }
+    val calc = remember(q) { evalExpression(q) }
+    val settingsHits = remember(q) {
+        if (q.length >= 2) settingsShortcuts.filter { it.first.contains(q, ignoreCase = true) } else emptyList()
+    }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columns),
+        modifier = modifier
+            .background(Obsidian.copy(alpha = 0.90f), RoundedCornerShape(24.dp))
+            .glass(RoundedCornerShape(24.dp))
+            .padding(12.dp)
+    ) {
+        if (calc != null) {
+            item(key = "calc", span = { GridItemSpan(maxLineSpan) }) {
+                ResultRow("= $calc", "Tap to copy") { clipboard.setText(AnnotatedString(calc)) }
+            }
+        }
+        settingsHits.forEach { (title, action) ->
+            item(key = "set_$title", span = { GridItemSpan(maxLineSpan) }) {
+                ResultRow(title, "Open in Android settings") { openSystemPage(context, action); onDone() }
+            }
+        }
+        items(matches, key = { it.component.flattenToString() }) { app ->
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 10.dp, horizontal = 2.dp)
+                    .bounceClick { onLaunch(app) },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                NovaIcon(app, iconSize.dp, iconShape, finish = iconFinish)
+                if (showLabels) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        app.label, color = TextPrimary, fontSize = 11.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+        item(key = "web", span = { GridItemSpan(maxLineSpan) }) {
+            ResultRow("Search the web for \"$q\"", "Opens your browser") { webSearch(context, q) }
+        }
+    }
+}

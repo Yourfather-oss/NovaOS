@@ -218,7 +218,7 @@ fun ClassicHome(
                             )
                             .padding(2.dp)
                             .clickable { selected = if (sel == app.packageName) null else app.packageName }
-                    ) { NovaIcon(app, 44.dp, prefs.iconShape) }
+                    ) { NovaIcon(app, 44.dp, prefs.iconShape, finish = prefs.iconFinish) }
                 }
             }
         }
@@ -285,7 +285,7 @@ private fun ClassicCell(
                     if (isSelected) Modifier.border(2.dp, accent, RoundedCornerShape(20.dp)).padding(3.dp)
                     else Modifier
                 )
-            ) { NovaIcon(app, prefs.iconSize.dp, prefs.iconShape) }
+            ) { NovaIcon(app, prefs.iconSize.dp, prefs.iconShape, finish = prefs.iconFinish) }
             if (prefs.showLabels) {
                 Spacer(Modifier.height(5.dp))
                 Text(

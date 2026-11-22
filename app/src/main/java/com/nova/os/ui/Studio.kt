@@ -131,6 +131,13 @@ fun DesignStudioScreen(prefs: NovaPrefs, store: SettingsStore, onEditPages: () -
         ) { scope.launch { store.setIconShape(it) } }
 
         Spacer(Modifier.height(24.dp))
+        Label("ICON FINISH  (classic mode)")
+        ChipRow(
+            listOf("glass" to "Premium glass", "plain" to "Plain"),
+            prefs.iconFinish
+        ) { scope.launch { store.put("icon_finish", it) } }
+
+        Spacer(Modifier.height(24.dp))
         Label("ICON SIZE")
         ChipRow(
             listOf("46" to "Small", "54" to "Medium", "62" to "Large"),
