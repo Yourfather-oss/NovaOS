@@ -53,7 +53,8 @@ data class NovaPrefs(
     val homeMusic: Boolean = false,
     val homeFrequent: Boolean = true,
     val homeNote: Boolean = true,
-    val homeOrder: String = "frequent,upcoming,stats,music,note"
+    val homeOrder: String = "frequent,upcoming,stats,music,note",
+    val frequentPos: String = "bottom"
 )
 
 class SettingsStore(private val context: Context) {
@@ -116,7 +117,8 @@ class SettingsStore(private val context: Context) {
             homeMusic = p[booleanPreferencesKey("w_music")] ?: false,
             homeFrequent = p[booleanPreferencesKey("w_frequent")] ?: true,
             homeNote = p[booleanPreferencesKey("w_note")] ?: true,
-            homeOrder = p[stringPreferencesKey("home_order")] ?: "frequent,upcoming,stats,music,note"
+            homeOrder = p[stringPreferencesKey("home_order")] ?: "frequent,upcoming,stats,music,note",
+            frequentPos = p[stringPreferencesKey("frequent_pos")] ?: "bottom"
         )
     }
 

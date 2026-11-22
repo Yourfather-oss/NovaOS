@@ -148,6 +148,9 @@ fun DesignStudioScreen(
         ToggleRow("Upcoming today", prefs.homeUpcoming) { scope.launch { store.put("w_upcoming", it) } }
         ToggleRow("Music player", prefs.homeMusic) { scope.launch { store.put("w_music", it) } }
         ToggleRow("Frequently used apps", prefs.homeFrequent) { scope.launch { store.put("w_frequent", it) } }
+        ToggleRow("Pin frequently used just above search", prefs.frequentPos == "bottom") {
+            scope.launch { store.put("frequent_pos", if (it) "bottom" else "list") }
+        }
         ToggleRow("Note card", prefs.homeNote) { scope.launch { store.put("w_note", it) } }
         Spacer(Modifier.height(4.dp))
         Spacer(Modifier.height(20.dp))
@@ -170,7 +173,7 @@ fun DesignStudioScreen(
             }
         }
         Spacer(Modifier.height(6.dp))
-        Text("Tip: long-press the Frequently used row on the home screen to move it right there.", color = TextMuted, fontSize = 12.sp)
+        Text("Tip: long-press the Frequently used row on the home screen to pin, unpin or move it.", color = TextMuted, fontSize = 12.sp)
         Spacer(Modifier.height(4.dp))
         Text("If the screen is too short for everything, NOVA hides widgets from the bottom of this order automatically.", color = TextMuted, fontSize = 12.sp)
 

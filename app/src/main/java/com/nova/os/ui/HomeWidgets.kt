@@ -145,9 +145,12 @@ fun HomeInfo(
             "music" to 96,
             "note" to 92
         )
+        val pinned = prefs.frequentPos == "bottom" && enabled["frequent"] == true
         var used = 150.dp + if (timerText != null) 18.dp else 0.dp
+        if (pinned) used += ((heights["frequent"] ?: 104) + 14).dp
         val show = mutableSetOf<String>()
         for (id in orderIds) {
+            if (id == "frequent" && pinned) continue
             val need = ((heights[id] ?: 100) + 14).dp
             if (enabled[id] == true && used + need <= avail) {
                 show += id
@@ -168,6 +171,23 @@ fun HomeInfo(
             }
         }
 
+        val frequentCard: @Composable (Modifier) -> Unit = { mod ->
+            FrequentCard(
+                apps = frequent,
+                prefs = prefs,
+                onLaunch = onLaunch,
+                modifier = mod,
+                moving = moving,
+                pinned = pinned,
+                canUp = !pinned && visible.indexOf("frequent") > 0,
+                canDown = !pinned && visible.indexOf("frequent") in 0 until visible.lastIndex,
+                onStartMove = { moving = true },
+                onUp = { move("frequent", -1) },
+                onDown = { move("frequent", 1) },
+                onTogglePin = { onPutPref("frequent_pos", if (pinned) "list" else "bottom") },
+                onDone = { moving = false }
+            )
+        }
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // Header: wordmark, then the clock and weather on one row, then the date.
             Column(Modifier.fillMaxWidth()) {
@@ -217,18 +237,7 @@ fun HomeInfo(
                     "stats" -> StatsCard(stats)
                     "upcoming" -> UpcomingCard(prefs)
                     "music" -> MusicCard()
-                    "frequent" -> FrequentCard(
-                        apps = frequent,
-                        prefs = prefs,
-                        onLaunch = onLaunch,
-                        moving = moving,
-                        canUp = visible.indexOf("frequent") > 0,
-                        canDown = visible.indexOf("frequent") < visible.lastIndex,
-                        onStartMove = { moving = true },
-                        onUp = { move("frequent", -1) },
-                        onDown = { move("frequent", 1) },
-                        onDone = { moving = false }
-                    )
+                    "frequent" -> frequentCard(Modifier)
                     "note" -> Column(
                         Modifier
                             .fillMaxWidth()
@@ -246,6 +255,7 @@ fun HomeInfo(
                 }
             }
         }
+        if (pinned) frequentCard(Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -658,12 +668,15 @@ private fun FrequentCard(
     apps: List<AppInfo>,
     prefs: NovaPrefs,
     onLaunch: (AppInfo) -> Unit,
+    modifier: Modifier,
     moving: Boolean,
+    pinned: Boolean,
     canUp: Boolean,
     canDown: Boolean,
     onStartMove: () -> Unit,
     onUp: () -> Unit,
     onDown: () -> Unit,
+    onTogglePin: () -> Unit,
     onDone: () -> Unit
 ) {
     if (apps.isEmpty()) return
@@ -671,7 +684,7 @@ private fun FrequentCard(
     val iconSize = prefs.iconSize.coerceIn(44, 60)
     val shape = RoundedCornerShape(24.dp)
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .glass(shape)
             .then(if (moving) Modifier.border(1.5.dp, accent, shape) else Modifier)
@@ -683,10 +696,14 @@ private fun FrequentCard(
                 Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("MOVE ROW", color = accent, fontSize = 10.sp, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
-                MoveChip("▲", canUp, onUp)
-                Spacer(Modifier.width(6.dp))
-                MoveChip("▼", canDown, onDown)
+                Text(if (pinned) "PINNED ABOVE SEARCH" else "MOVE ROW", color = accent, fontSize = 10.sp, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
+                if (!pinned) {
+                    MoveChip("▲", canUp, onUp)
+                    Spacer(Modifier.width(6.dp))
+                    MoveChip("▼", canDown, onDown)
+                    Spacer(Modifier.width(6.dp))
+                }
+                MoveChip(if (pinned) "Unpin" else "Pin ↓", true, onTogglePin)
                 Spacer(Modifier.width(6.dp))
                 MoveChip("Done", true, onDone)
             }
