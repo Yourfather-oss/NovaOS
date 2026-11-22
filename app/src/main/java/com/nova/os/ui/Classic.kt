@@ -1,5 +1,6 @@
 package com.nova.os.ui
 
+import androidx.compose.foundation.layout.BoxWithConstraints
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -218,7 +219,7 @@ fun ClassicHome(
                             )
                             .padding(2.dp)
                             .clickable { selected = if (sel == app.packageName) null else app.packageName }
-                    ) { NovaIcon(app, 44.dp, prefs.iconShape, finish = prefs.iconFinish) }
+                    ) { NovaIcon(app, 44.dp, prefs.iconShape) }
                 }
             }
         }
@@ -272,7 +273,8 @@ private fun ClassicCell(
     val context = LocalContext.current
     val accent = LocalAccent.current
     var menu by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val iconDp = minOf(prefs.iconSize.dp, maxWidth - 8.dp)
         Column(
             Modifier
                 .fillMaxWidth()
@@ -285,7 +287,7 @@ private fun ClassicCell(
                     if (isSelected) Modifier.border(2.dp, accent, RoundedCornerShape(20.dp)).padding(3.dp)
                     else Modifier
                 )
-            ) { NovaIcon(app, prefs.iconSize.dp, prefs.iconShape, finish = prefs.iconFinish) }
+            ) { NovaIcon(app, iconDp, prefs.iconShape) }
             if (prefs.showLabels) {
                 Spacer(Modifier.height(5.dp))
                 Text(

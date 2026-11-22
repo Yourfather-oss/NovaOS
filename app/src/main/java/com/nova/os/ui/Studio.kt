@@ -1,5 +1,24 @@
 package com.nova.os.ui
 
+import kotlin.math.roundToInt
+import java.io.File
+import com.nova.os.data.importWallpaper
+import com.nova.os.data.WALLPAPER_FILE
+import com.nova.os.data.ThemePresets
+import com.nova.os.data.ThemePreset
+import com.nova.os.data.AppInfo
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Slider
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.widget.Toast
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.background
@@ -41,7 +60,13 @@ import com.nova.os.data.SettingsStore
 import kotlinx.coroutines.launch
 
 @Composable
-fun DesignStudioScreen(prefs: NovaPrefs, store: SettingsStore, onEditPages: () -> Unit, onBack: () -> Unit) {
+fun DesignStudioScreen(
+    prefs: NovaPrefs,
+    store: SettingsStore,
+    apps: List<AppInfo>,
+    onEditPages: () -> Unit,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val accent = LocalAccent.current
@@ -59,7 +84,37 @@ fun DesignStudioScreen(prefs: NovaPrefs, store: SettingsStore, onEditPages: () -
         Text("Changes apply instantly", color = TextMuted, fontSize = 13.sp)
         Spacer(Modifier.height(18.dp))
 
-        Preview(prefs)
+        var sizeDraft by remember(prefs.iconSize) { mutableFloatStateOf(prefs.iconSize.toFloat()) }
+        var dimDraft by remember(prefs.wallpaperDim) { mutableFloatStateOf(prefs.wallpaperDim.toFloat()) }
+        val hasPhoto = remember(prefs.wallpaperRev, prefs.wallpaper) { File(context.filesDir, WALLPAPER_FILE).exists() }
+        val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) {
+                scope.launch {
+                    if (importWallpaper(context, uri)) {
+                        store.put("wallpaper_rev", System.currentTimeMillis().toString())
+                        store.setWallpaper("custom")
+                    } else {
+                        Toast.makeText(context, "Couldn't use that photo", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
+        Preview(prefs, apps, sizeDraft.roundToInt())
+
+        Spacer(Modifier.height(24.dp))
+        Label("THEMES")
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ThemePresets.forEach { t ->
+                val active = prefs.accent == t.accent && prefs.wallpaper == t.wallpaper &&
+                    prefs.surface == t.surface && prefs.iconShape == t.iconShape &&
+                    prefs.iconFinish == t.iconFinish && prefs.clockFont == t.clockFont &&
+                    prefs.clockWeight == t.clockWeight
+                ThemeCard(t, active) { scope.launch { store.applyTheme(t) } }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text("Tap a theme to set wallpaper, colours, icons and clock together. You can fine-tune below.", color = TextMuted, fontSize = 12.sp)
 
         Spacer(Modifier.height(28.dp))
         Label("HOME MODE")
@@ -116,35 +171,74 @@ fun DesignStudioScreen(prefs: NovaPrefs, store: SettingsStore, onEditPages: () -
 
         Spacer(Modifier.height(24.dp))
         Label("WALLPAPER")
-        ChipRow(
-            listOf("aurora" to "Aurora", "nebula" to "Nebula", "midnight" to "Midnight"),
-            prefs.wallpaper
-        ) { scope.launch { store.setWallpaper(it) } }
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            WallpaperNames.forEach { (id, label) ->
+                WallpaperTile(label, wallpaperSwatch(id), prefs.wallpaper == id) { scope.launch { store.setWallpaper(id) } }
+            }
+            if (hasPhoto) {
+                WallpaperTile("Your photo", listOf(Color(0xFF4A4F5C), Color(0xFF1A1D24)), prefs.wallpaper == "custom") {
+                    scope.launch { store.setWallpaper("custom") }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        StudioButton("Choose a photo from your gallery") {
+            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+        if (prefs.wallpaper == "custom") {
+            Spacer(Modifier.height(10.dp))
+            Text("Dim photo  ${dimDraft.roundToInt()}%", color = TextPrimary, fontSize = 14.sp)
+            Slider(
+                value = dimDraft,
+                onValueChange = { dimDraft = it },
+                onValueChangeFinished = { scope.launch { store.setWallpaperDim(dimDraft.roundToInt()) } },
+                valueRange = 0f..80f,
+                colors = SliderDefaults.colors(
+                    thumbColor = LocalAccent.current,
+                    activeTrackColor = LocalAccent.current,
+                    inactiveTrackColor = GlassFill
+                )
+            )
+        }
         Spacer(Modifier.height(8.dp))
         ToggleRow("Animated wallpaper", prefs.liveWallpaper) { scope.launch { store.setLiveWallpaper(it) } }
 
         Spacer(Modifier.height(24.dp))
         Label("ICON SHAPE")
         ChipRow(
-            listOf("squircle" to "Squircle", "circle" to "Circle", "original" to "Original"),
+            listOf(
+                "squircle" to "Squircle", "circle" to "Circle", "rounded" to "Rounded",
+                "teardrop" to "Teardrop", "hexagon" to "Hexagon", "original" to "Original"
+            ),
             prefs.iconShape
         ) { scope.launch { store.setIconShape(it) } }
 
         Spacer(Modifier.height(24.dp))
-        Label("ICON FINISH  (classic mode)")
+        Label("ICON STYLE")
         ChipRow(
-            listOf("glass" to "Premium glass", "plain" to "Plain"),
+            listOf(
+                "glass" to "Glass", "tile" to "Dark tile", "neon" to "Neon",
+                "mono" to "Mono glass", "plain" to "Plain"
+            ),
             prefs.iconFinish
         ) { scope.launch { store.put("icon_finish", it) } }
 
         Spacer(Modifier.height(24.dp))
-        Label("ICON SIZE")
-        ChipRow(
-            listOf("46" to "Small", "54" to "Medium", "62" to "Large"),
-            prefs.iconSize.toString()
-        ) { scope.launch { store.setIconSize(it.toInt()) } }
+        Label("ICON SIZE  ${sizeDraft.roundToInt()} dp")
+        Slider(
+            value = sizeDraft,
+            onValueChange = { sizeDraft = it },
+            onValueChangeFinished = { scope.launch { store.setIconSize(sizeDraft.roundToInt()) } },
+            valueRange = 40f..76f,
+            steps = 17,
+            colors = SliderDefaults.colors(
+                thumbColor = LocalAccent.current,
+                activeTrackColor = LocalAccent.current,
+                inactiveTrackColor = GlassFill
+            )
+        )
         Spacer(Modifier.height(8.dp))
-        ToggleRow("Show app labels in drawer", prefs.showLabels) { scope.launch { store.setShowLabels(it) } }
+        ToggleRow("Show app labels", prefs.showLabels) { scope.launch { store.setShowLabels(it) } }
 
         Spacer(Modifier.height(24.dp))
         Label("CLOCK FONT")
@@ -217,13 +311,8 @@ fun DesignStudioScreen(prefs: NovaPrefs, store: SettingsStore, onEditPages: () -
 }
 
 @Composable
-private fun Preview(prefs: NovaPrefs) {
+private fun Preview(prefs: NovaPrefs, apps: List<AppInfo>, iconSize: Int) {
     val accent = LocalAccent.current
-    val shape = when (prefs.iconShape) {
-        "circle" -> CircleShape
-        "original" -> RoundedCornerShape(2.dp)
-        else -> RoundedCornerShape((prefs.iconSize * 0.3f).dp)
-    }
     Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(22.dp)).padding(18.dp)) {
         Text("PREVIEW", color = TextMuted, fontSize = 10.sp, letterSpacing = 3.sp)
         Spacer(Modifier.height(8.dp))
@@ -237,16 +326,71 @@ private fun Preview(prefs: NovaPrefs) {
             )
         )
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            repeat(4) {
-                Box(
-                    Modifier
-                        .size(prefs.iconSize.dp)
-                        .clip(shape)
-                        .background(Brush.linearGradient(listOf(accent, Nebula)))
-                )
-            }
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            apps.take(4).forEach { NovaIcon(it, iconSize.dp, prefs.iconShape) }
         }
+    }
+}
+
+@Composable
+private fun ThemeCard(preset: ThemePreset, active: Boolean, onClick: () -> Unit) {
+    val accent = LocalAccent.current
+    val accentColor = accentFor(preset.accent)
+    val shape = RoundedCornerShape(20.dp)
+    Box(
+        Modifier
+            .width(112.dp)
+            .height(150.dp)
+            .clip(shape)
+            .background(Brush.linearGradient(wallpaperSwatch(preset.wallpaper)))
+            .border(if (active) 2.5.dp else 1.dp, if (active) accent else GlassBorder, shape)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(10.dp)
+                .size(14.dp)
+                .clip(CircleShape)
+                .background(accentColor)
+        )
+        Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                repeat(3) {
+                    Box(
+                        Modifier
+                            .size(18.dp)
+                            .clip(iconShapeFor(preset.iconShape, 18.dp))
+                            .background(Color.White.copy(alpha = 0.55f))
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(preset.name, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun WallpaperTile(label: String, colors: List<Color>, selected: Boolean, onClick: () -> Unit) {
+    val accent = LocalAccent.current
+    val shape = RoundedCornerShape(18.dp)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier
+                .width(72.dp)
+                .height(104.dp)
+                .clip(shape)
+                .background(Brush.linearGradient(colors))
+                .border(if (selected) 2.5.dp else 1.dp, if (selected) accent else GlassBorder, shape)
+                .clickable(onClick = onClick)
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(label, color = if (selected) accent else TextMuted, fontSize = 11.sp)
     }
 }
 

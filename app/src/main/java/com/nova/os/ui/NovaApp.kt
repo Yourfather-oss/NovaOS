@@ -237,9 +237,9 @@ fun NovaApp(homeSignal: Int) {
     val enter = slideInVertically(tween(ms(380))) { it / 4 } + fadeIn(tween(ms(380)))
     val exit = slideOutVertically(tween(ms(300))) { it / 4 } + fadeOut(tween(ms(250)))
 
-    NovaTheme(prefs.accent, prefs.surface) {
+    NovaTheme(prefs.accent, prefs.surface, prefs.iconFinish) {
         Box(Modifier.fillMaxSize().background(Obsidian)) {
-            NovaBackdrop(prefs.wallpaper, prefs.liveWallpaper && prefs.animSpeed != "off")
+            NovaBackdrop(prefs.wallpaper, prefs.liveWallpaper && prefs.animSpeed != "off", prefs.wallpaperDim, prefs.wallpaperRev)
 
             if (screen != Screen.Splash) {
                 Box(
@@ -292,6 +292,7 @@ fun NovaApp(homeSignal: Int) {
                 DesignStudioScreen(
                     prefs = prefs,
                     store = store,
+                    apps = visibleApps,
                     onEditPages = { editingPages = true; screen = Screen.Home },
                     onBack = { screen = Screen.Home }
                 )

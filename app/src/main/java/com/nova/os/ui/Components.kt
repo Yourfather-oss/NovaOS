@@ -1,5 +1,12 @@
 package com.nova.os.ui
 
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
@@ -80,31 +87,94 @@ fun Modifier.bounceClick(onLongClick: (() -> Unit)? = null, onClick: () -> Unit)
 /** Stops touches from falling through to the layer underneath. */
 fun Modifier.blockTouches(): Modifier = pointerInput(Unit) { detectTapGestures { } }
 
+private object HexagonShape : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val w = size.width
+        val h = size.height
+        val path = Path().apply {
+            moveTo(w * 0.5f, 0f)
+            lineTo(w, h * 0.25f)
+            lineTo(w, h * 0.75f)
+            lineTo(w * 0.5f, h)
+            lineTo(0f, h * 0.75f)
+            lineTo(0f, h * 0.25f)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
+internal fun iconShapeFor(shape: String, size: Dp): Shape = when (shape) {
+    "circle" -> CircleShape
+    "rounded" -> RoundedCornerShape(size * 0.18f)
+    "teardrop" -> RoundedCornerShape(
+        topStartPercent = 50, topEndPercent = 50, bottomEndPercent = 50, bottomStartPercent = 12
+    )
+    "hexagon" -> HexagonShape
+    "original" -> RoundedCornerShape(0.dp)
+    else -> RoundedCornerShape(size * 0.3f)
+}
+
+/**
+ * App icon in the chosen shape and style: glass, dark tile, neon, mono glass or plain.
+ * The style follows the Design Studio unless [finish] is given.
+ */
 @Composable
 fun NovaIcon(
     app: AppInfo,
     size: Dp,
     shape: String,
     modifier: Modifier = Modifier,
-    finish: String = "plain"
+    finish: String? = null
 ) {
-    if (finish == "glass" && shape != "original") {
-        // Premium glass tile: frosted plate, bright rim, specular highlight, icon floating inside.
-        val outer = if (shape == "circle") CircleShape else RoundedCornerShape(size * 0.3f)
-        val inner = if (shape == "circle") CircleShape else RoundedCornerShape(size * 0.2f)
-        Box(
-            modifier
+    val style = finish ?: LocalIconFinish.current
+    val accent = LocalAccent.current
+    val outer = iconShapeFor(shape, size)
+
+    if (shape == "original") {
+        Image(
+            bitmap = app.icon, contentDescription = app.label,
+            modifier = modifier.size(size), contentScale = ContentScale.Crop
+        )
+        return
+    }
+    if (style == "plain") {
+        Image(
+            bitmap = app.icon, contentDescription = app.label,
+            modifier = modifier
                 .size(size)
-                .shadow(10.dp, outer, ambientColor = Color.Black, spotColor = Color.Black)
+                .shadow(8.dp, outer, ambientColor = Color.Black, spotColor = Color.Black)
                 .clip(outer)
-                .background(Brush.linearGradient(listOf(Color(0x59FFFFFF), Color(0x14FFFFFF), Color(0x2EFFFFFF))))
-                .border(
-                    1.2.dp,
-                    Brush.linearGradient(listOf(Color(0xCCFFFFFF), Color(0x1AFFFFFF), Color(0x66FFFFFF))),
-                    outer
-                )
-                .drawWithContent {
-                    drawContent()
+                .border(1.dp, Brush.linearGradient(listOf(Color(0x77FFFFFF), Color(0x11FFFFFF))), outer),
+            contentScale = ContentScale.Crop
+        )
+        return
+    }
+
+    val inner = iconShapeFor(shape, size * 0.74f)
+    val glassy = style == "glass" || style == "mono"
+    val neon = style == "neon"
+    val fill: Brush = when (style) {
+        "tile" -> Brush.verticalGradient(listOf(Color(0xFF223049), Color(0xFF131C2C)))
+        "neon" -> Brush.verticalGradient(listOf(Color(0xFF0C1424), Color(0xFF070C16)))
+        else -> Brush.linearGradient(listOf(Color(0x59FFFFFF), Color(0x14FFFFFF), Color(0x2EFFFFFF)))
+    }
+    val rim: Brush = when (style) {
+        "neon" -> Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.35f), accent))
+        "tile" -> Brush.linearGradient(listOf(Color(0x44FFFFFF), Color(0x11FFFFFF)))
+        else -> Brush.linearGradient(listOf(Color(0xCCFFFFFF), Color(0x1AFFFFFF), Color(0x66FFFFFF)))
+    }
+    val glow = if (neon) accent else Color.Black
+    Box(
+        modifier
+            .size(size)
+            .shadow(if (neon) 14.dp else 10.dp, outer, ambientColor = glow, spotColor = glow)
+            .clip(outer)
+            .background(fill)
+            .border(if (neon) 1.6.dp else 1.2.dp, rim, outer)
+            .drawWithContent {
+                drawContent()
+                if (glassy) {
                     drawRect(
                         brush = Brush.verticalGradient(
                             listOf(Color(0x47FFFFFF), Color.Transparent),
@@ -112,33 +182,18 @@ fun NovaIcon(
                         ),
                         size = Size(this.size.width, this.size.height * 0.5f)
                     )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                bitmap = app.icon,
-                contentDescription = app.label,
-                modifier = Modifier.size(size * 0.74f).clip(inner),
-                contentScale = ContentScale.Crop
-            )
-        }
-        return
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            bitmap = app.icon,
+            contentDescription = app.label,
+            modifier = Modifier.size(size * 0.74f).clip(inner),
+            contentScale = ContentScale.Crop,
+            colorFilter = if (style == "mono") ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) else null
+        )
     }
-    val s = when (shape) {
-        "circle" -> CircleShape
-        "original" -> RoundedCornerShape(0.dp)
-        else -> RoundedCornerShape(size * 0.3f)
-    }
-    val m = if (shape == "original") {
-        modifier.size(size)
-    } else {
-        modifier
-            .size(size)
-            .shadow(8.dp, s, ambientColor = Color.Black, spotColor = Color.Black)
-            .clip(s)
-            .border(1.dp, Brush.linearGradient(listOf(Color(0x77FFFFFF), Color(0x11FFFFFF))), s)
-    }
-    Image(bitmap = app.icon, contentDescription = app.label, modifier = m, contentScale = ContentScale.Crop)
 }
 
 @Composable

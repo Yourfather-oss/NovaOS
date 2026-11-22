@@ -43,7 +43,9 @@ data class NovaPrefs(
     val tasks: List<Task> = emptyList(),
     val focusLog: List<Long> = emptyList(),
     val aiKey: String = "",
-    val aiModel: String = "claude-haiku-5-5"
+    val aiModel: String = "claude-haiku-5-5",
+    val wallpaperDim: Int = 35,
+    val wallpaperRev: Long = 0L
 )
 
 class SettingsStore(private val context: Context) {
@@ -96,7 +98,9 @@ class SettingsStore(private val context: Context) {
             tasks = decodeTasks(p[stringPreferencesKey("tasks")]),
             focusLog = (p[stringPreferencesKey("focus_log")] ?: "").split(",").mapNotNull { it.toLongOrNull() },
             aiKey = p[stringPreferencesKey("ai_key")] ?: "",
-            aiModel = p[stringPreferencesKey("ai_model")] ?: "claude-haiku-5-5"
+            aiModel = p[stringPreferencesKey("ai_model")] ?: "claude-haiku-5-5",
+            wallpaperDim = p[intPreferencesKey("wallpaper_dim")] ?: 35,
+            wallpaperRev = p[stringPreferencesKey("wallpaper_rev")]?.toLongOrNull() ?: 0L
         )
     }
 
@@ -124,6 +128,18 @@ class SettingsStore(private val context: Context) {
     suspend fun setClockSize(value: String) = context.novaStore.edit { it[clockSizeKey] = value }
     suspend fun setAnimSpeed(value: String) = context.novaStore.edit { it[animSpeedKey] = value }
     suspend fun setLiveWallpaper(value: Boolean) = context.novaStore.edit { it[liveWallpaperKey] = value }
+
+    suspend fun setWallpaperDim(value: Int) = context.novaStore.edit { it[intPreferencesKey("wallpaper_dim")] = value }
+
+    suspend fun applyTheme(t: ThemePreset) = context.novaStore.edit {
+        it[accentKey] = t.accent
+        it[wallpaperKey] = t.wallpaper
+        it[surfaceKey] = t.surface
+        it[iconShapeKey] = t.iconShape
+        it[stringPreferencesKey("icon_finish")] = t.iconFinish
+        it[clockFontKey] = t.clockFont
+        it[clockWeightKey] = t.clockWeight
+    }
 
     suspend fun put(key: String, value: String) = context.novaStore.edit { it[stringPreferencesKey(key)] = value }
 

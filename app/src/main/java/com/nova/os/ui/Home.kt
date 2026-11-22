@@ -319,7 +319,7 @@ fun HomeScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            val manyDock = dock.size > 5
+            val manyDock = dock.size * (prefs.iconSize + 6) > 312
             val dockScroll = rememberScrollState()
             val dockBase = when (prefs.dockStyle) {
                 "none" -> Modifier.fillMaxWidth()
@@ -339,8 +339,7 @@ fun HomeScreen(
                 dock.forEach { app ->
                     NovaIcon(
                         app, prefs.iconSize.dp, prefs.iconShape,
-                        Modifier.bounceClick { launchAndClear(app) },
-                        finish = if (classic) prefs.iconFinish else "plain"
+                        Modifier.bounceClick { launchAndClear(app) }
                     )
                 }
             }

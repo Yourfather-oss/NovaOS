@@ -30,11 +30,13 @@ val AccentChoices: List<Pair<String, Color>> = listOf(
     "mint" to Color(0xFF2DD4A7),
     "amber" to Color(0xFFFFB020),
     "rose" to Color(0xFFFF5C8A),
-    "blue" to Color(0xFF4C8DFF)
+    "blue" to Color(0xFF4C8DFF),
+    "ice" to Color(0xFFE6ECF5)
 )
 
 val LocalAccent = staticCompositionLocalOf { Cyan }
 val LocalSurface = staticCompositionLocalOf { "glass" }
+val LocalIconFinish = staticCompositionLocalOf { "glass" }
 
 fun accentFor(name: String): Color = AccentChoices.firstOrNull { it.first == name }?.second ?: Cyan
 
@@ -57,10 +59,11 @@ fun clockSizeSp(name: String): Int = when (name) {
 }
 
 @Composable
-fun NovaTheme(accentName: String, surface: String, content: @Composable () -> Unit) {
+fun NovaTheme(accentName: String, surface: String, iconFinish: String, content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalAccent provides accentFor(accentName),
         LocalSurface provides surface,
+        LocalIconFinish provides iconFinish,
         content = content
     )
 }
