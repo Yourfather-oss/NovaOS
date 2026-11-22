@@ -41,7 +41,7 @@ import com.nova.os.data.SettingsStore
 import kotlinx.coroutines.launch
 
 @Composable
-fun DesignStudioScreen(prefs: NovaPrefs, store: SettingsStore, onBack: () -> Unit) {
+fun DesignStudioScreen(prefs: NovaPrefs, store: SettingsStore, onEditPages: () -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val accent = LocalAccent.current
@@ -73,6 +73,24 @@ fun DesignStudioScreen(prefs: NovaPrefs, store: SettingsStore, onBack: () -> Uni
             else "Clean home with the A–Z app drawer. Swipe up to open it.",
             color = TextMuted, fontSize = 12.sp
         )
+
+        if (prefs.homeMode == "classic") {
+            Spacer(Modifier.height(20.dp))
+            Label("PAGE GRID  (columns × rows)")
+            ChipRow(
+                listOf("4x5" to "4×5", "4x6" to "4×6", "5x6" to "5×6"),
+                prefs.gridPreset
+            ) { scope.launch { store.put("grid_preset", it) } }
+            Spacer(Modifier.height(12.dp))
+            StudioButton("Edit home pages") { onEditPages() }
+        }
+
+        Spacer(Modifier.height(28.dp))
+        Label("DOCK STYLE")
+        ChipRow(
+            listOf("floating" to "Floating", "flat" to "Flat", "none" to "No background"),
+            prefs.dockStyle
+        ) { scope.launch { store.put("dock_style", it) } }
 
         Spacer(Modifier.height(28.dp))
         Label("SURFACE")

@@ -34,7 +34,11 @@ data class NovaPrefs(
     val gestureLong: String = "studio",
     val gestureDouble: String = "none",
     val hidden: List<String> = emptyList(),
-    val homeMode: String = "nova"
+    val homeMode: String = "nova",
+    val classicPages: List<List<String>> = emptyList(),
+    val classicUnplaced: List<String> = emptyList(),
+    val gridPreset: String = "4x5",
+    val dockStyle: String = "floating"
 )
 
 class SettingsStore(private val context: Context) {
@@ -78,7 +82,11 @@ class SettingsStore(private val context: Context) {
             gestureLong = p[stringPreferencesKey("g_long")] ?: "studio",
             gestureDouble = p[stringPreferencesKey("g_double")] ?: "none",
             hidden = (p[stringPreferencesKey("hidden")] ?: "").split(",").filter { it.isNotBlank() },
-            homeMode = p[stringPreferencesKey("home_mode")] ?: "nova"
+            homeMode = p[stringPreferencesKey("home_mode")] ?: "nova",
+            classicPages = decodePages(p[stringPreferencesKey("classic_pages")]),
+            classicUnplaced = (p[stringPreferencesKey("classic_unplaced")] ?: "").split(",").filter { it.isNotBlank() },
+            gridPreset = p[stringPreferencesKey("grid_preset")] ?: "4x5",
+            dockStyle = p[stringPreferencesKey("dock_style")] ?: "floating"
         )
     }
 
@@ -108,6 +116,11 @@ class SettingsStore(private val context: Context) {
     suspend fun setLiveWallpaper(value: Boolean) = context.novaStore.edit { it[liveWallpaperKey] = value }
 
     suspend fun put(key: String, value: String) = context.novaStore.edit { it[stringPreferencesKey(key)] = value }
+
+    suspend fun setClassicLayout(pages: List<List<String>>, unplaced: List<String>) = context.novaStore.edit {
+        it[stringPreferencesKey("classic_pages")] = encodePages(pages)
+        it[stringPreferencesKey("classic_unplaced")] = unplaced.joinToString(",")
+    }
 
     suspend fun logLaunch(packageName: String) = context.novaStore.edit { p ->
         val current = p[logKey]?.lines()?.filter { it.isNotBlank() }.orEmpty()
