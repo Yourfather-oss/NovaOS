@@ -37,7 +37,7 @@ data class NovaPrefs(
     val homeMode: String = "nova",
     val classicPages: List<List<String>> = emptyList(),
     val classicUnplaced: List<String> = emptyList(),
-    val gridPreset: String = "4x5",
+    val gridPreset: String = "5x6",
     val dockStyle: String = "floating",
     val iconFinish: String = "glass",
     val tasks: List<Task> = emptyList(),
@@ -102,7 +102,7 @@ class SettingsStore(private val context: Context) {
             homeMode = p[stringPreferencesKey("home_mode")] ?: "nova",
             classicPages = decodePages(p[stringPreferencesKey("classic_pages")]),
             classicUnplaced = (p[stringPreferencesKey("classic_unplaced")] ?: "").split(",").filter { it.isNotBlank() },
-            gridPreset = p[stringPreferencesKey("grid_preset")] ?: "4x5",
+            gridPreset = p[stringPreferencesKey("grid_preset")] ?: "5x6",
             dockStyle = p[stringPreferencesKey("dock_style")] ?: "floating",
             iconFinish = p[stringPreferencesKey("icon_finish")] ?: "glass",
             tasks = decodeTasks(p[stringPreferencesKey("tasks")]),
@@ -168,6 +168,16 @@ class SettingsStore(private val context: Context) {
     suspend fun setClassicLayout(pages: List<List<String>>, unplaced: List<String>) = context.novaStore.edit {
         it[stringPreferencesKey("classic_pages")] = encodePages(pages)
         it[stringPreferencesKey("classic_unplaced")] = unplaced.joinToString(",")
+    }
+
+    /** One-time restoration of the previously requested five-column classic grid. */
+    suspend fun restoreFiveColumnClassicGrid() = context.novaStore.edit { prefs ->
+        val migrated = booleanPreferencesKey("classic_five_column_restored_v1")
+        if (prefs[migrated] != true) {
+            val grid = stringPreferencesKey("grid_preset")
+            if (prefs[grid] == "4x5" || prefs[grid] == "4x6") prefs[grid] = "5x6"
+            prefs[migrated] = true
+        }
     }
 
     suspend fun setTasks(tasks: List<Task>) = context.novaStore.edit {

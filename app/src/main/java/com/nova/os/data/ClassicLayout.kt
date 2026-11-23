@@ -8,7 +8,8 @@ data class GridSpec(val cols: Int, val rows: Int) {
 fun gridSpec(preset: String): GridSpec = when (preset) {
     "4x6" -> GridSpec(4, 6)
     "5x6" -> GridSpec(5, 6)
-    else -> GridSpec(4, 5)
+    "4x5" -> GridSpec(4, 5)
+    else -> GridSpec(5, 6)
 }
 
 /** App pages (the fixed clock/widgets page is not part of this) plus apps not placed on any page. */

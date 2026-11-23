@@ -223,10 +223,10 @@ fun HomeScreen(
                 onHide = onHide,
                 onLayout = onSaveLayout,
                 onEditingChange = onEditingChange,
-                modifier = Modifier.fillMaxSize().padding(top = 8.dp, bottom = (prefs.iconSize + 128).dp)
+                modifier = Modifier.fillMaxSize().padding(top = 8.dp, bottom = (prefs.iconSize + 190).dp)
             )
         } else {
-            Box(Modifier.fillMaxSize().padding(top = 36.dp, bottom = (prefs.iconSize + 128).dp)) { infoBlock() }
+            Box(Modifier.fillMaxSize().padding(top = 36.dp, bottom = (prefs.iconSize + 190).dp)) { infoBlock() }
         }
 
         if (searching) {
@@ -245,6 +245,27 @@ fun HomeScreen(
         }
 
         Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
+            // Keep recently launched apps directly above search, separate from the dock.
+            if (!searching && recent.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    recent.take(5).forEach { app ->
+                        Column(
+                            Modifier.weight(1f).bounceClick { launchAndClear(app) },
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            NovaIcon(app, 40.dp, prefs.iconShape)
+                            if (prefs.showLabels) {
+                                Spacer(Modifier.height(3.dp))
+                                Text(app.label, color = TextPrimary, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            }
             if (classic) {
                 BasicTextField(
                     value = query,

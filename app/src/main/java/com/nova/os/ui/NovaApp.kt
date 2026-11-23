@@ -108,6 +108,7 @@ fun NovaApp(homeSignal: Int) {
     val scope = rememberCoroutineScope()
     val store = remember { SettingsStore(context) }
     val prefs by store.flow.collectAsState(initial = NovaPrefs())
+    LaunchedEffect(store) { store.restoreFiveColumnClassicGrid() }
     val speed = when (prefs.animSpeed) {
         "fast" -> 0.6f
         "slow" -> 1.6f
