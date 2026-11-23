@@ -1,0 +1,13 @@
+NOVA OS — App Drawer Frequent Apps Update
+
+Changes:
+- The app drawer search field has been moved to the bottom of the screen.
+- A compact four-app Frequently Used strip now appears immediately above the search field.
+- The strip is generated from NOVA's saved app launch history and launches the selected app directly.
+- The category filters remain at the top; the app grid uses the available space between filters and the bottom controls.
+
+Files changed:
+- app/src/main/java/com/nova/os/ui/Drawer.kt
+- app/src/main/java/com/nova/os/ui/NovaApp.kt
+
+This is a source update, not a compiled APK. The supplied Phase 13 archive does not include a complete Gradle build setup, so compilation has not been verified here.
