@@ -170,12 +170,15 @@ class SettingsStore(private val context: Context) {
         it[stringPreferencesKey("classic_unplaced")] = unplaced.joinToString(",")
     }
 
-    /** One-time restoration of the previously requested five-column classic grid. */
+    /**
+     * Restore the agreed five-column / six-row classic layout.
+     * Version 2 deliberately supersedes the earlier migration, which could already
+     * have been marked complete while a four-column preset remained saved.
+     */
     suspend fun restoreFiveColumnClassicGrid() = context.novaStore.edit { prefs ->
-        val migrated = booleanPreferencesKey("classic_five_column_restored_v1")
+        val migrated = booleanPreferencesKey("classic_five_column_restored_v2")
         if (prefs[migrated] != true) {
-            val grid = stringPreferencesKey("grid_preset")
-            if (prefs[grid] == "4x5" || prefs[grid] == "4x6") prefs[grid] = "5x6"
+            prefs[stringPreferencesKey("grid_preset")] = "5x6"
             prefs[migrated] = true
         }
     }

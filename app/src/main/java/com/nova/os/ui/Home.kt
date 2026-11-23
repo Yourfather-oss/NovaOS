@@ -245,24 +245,32 @@ fun HomeScreen(
         }
 
         Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
-            // Keep recently launched apps directly above search, separate from the dock.
-            if (!searching && recent.isNotEmpty()) {
+            // Persistent recent-apps slot: always occupies the same position directly
+            // above search and remains separate from the fixed dock below it.
+            if (!searching) {
                 Row(
-                    Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                    Modifier.fillMaxWidth().height(58.dp).padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    recent.take(5).forEach { app ->
-                        Column(
-                            Modifier.weight(1f).bounceClick { launchAndClear(app) },
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            NovaIcon(app, 40.dp, prefs.iconShape)
-                            if (prefs.showLabels) {
-                                Spacer(Modifier.height(3.dp))
-                                Text(app.label, color = TextPrimary, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (recent.isEmpty()) {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text("Recently opened apps appear here", color = TextMuted, fontSize = 11.sp)
+                        }
+                    } else {
+                        recent.take(5).forEach { app ->
+                            Column(
+                                Modifier.weight(1f).bounceClick { launchAndClear(app) },
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                NovaIcon(app, 40.dp, prefs.iconShape)
+                                if (prefs.showLabels) {
+                                    Spacer(Modifier.height(3.dp))
+                                    Text(app.label, color = TextPrimary, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                         }
+                        repeat((5 - recent.size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
