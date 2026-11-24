@@ -253,11 +253,7 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (recent.isEmpty()) {
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text("Recently opened apps appear here", color = TextMuted, fontSize = 11.sp)
-                        }
-                    } else {
+                    if (recent.isNotEmpty()) {
                         recent.take(5).forEach { app ->
                             Column(
                                 Modifier.weight(1f).bounceClick { launchAndClear(app) },

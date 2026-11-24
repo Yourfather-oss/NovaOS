@@ -108,7 +108,6 @@ fun NovaApp(homeSignal: Int) {
     val scope = rememberCoroutineScope()
     val store = remember { SettingsStore(context) }
     val prefs by store.flow.collectAsState(initial = NovaPrefs())
-    LaunchedEffect(store) { store.restoreFiveColumnClassicGrid() }
     val speed = when (prefs.animSpeed) {
         "fast" -> 0.6f
         "slow" -> 1.6f
@@ -143,6 +142,9 @@ fun NovaApp(homeSignal: Int) {
     BackHandler(enabled = editingPages && screen == Screen.Home) { editingPages = false }
 
     val visibleApps = remember(apps, prefs.hidden) { apps.filter { it.packageName !in prefs.hidden } }
+    LaunchedEffect(store, visibleApps) {
+        if (visibleApps.isNotEmpty()) store.restoreOriginalVisuals(defaultDock(visibleApps))
+    }
     val dockPackages = prefs.dock ?: defaultDock(visibleApps)
     val dockApps = dockPackages.mapNotNull { pkg -> visibleApps.firstOrNull { it.packageName == pkg } }
 

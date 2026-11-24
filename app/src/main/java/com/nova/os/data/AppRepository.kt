@@ -74,6 +74,7 @@ fun openAppInfo(context: Context, app: AppInfo) {
 
 /** First-run dock: match common apps by package name, in this order. */
 fun defaultDock(apps: List<AppInfo>): List<String> {
-    val wanted = listOf("dialer", "messag", "chrome", "camera")
+    // Original NOVA dock: Messages, Chrome, Camera, Truecaller.
+    val wanted = listOf("messag", "chrome", "camera", "truecaller")
     return wanted.mapNotNull { key -> apps.firstOrNull { it.packageName.contains(key, true) }?.packageName }
 }

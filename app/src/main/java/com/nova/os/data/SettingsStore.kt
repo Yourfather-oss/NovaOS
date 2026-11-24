@@ -16,11 +16,11 @@ data class NovaPrefs(
     val use24h: Boolean = true,
     val dock: List<String>? = null,
     val wallpaper: String = "aurora",
-    val iconShape: String = "squircle",
+    val iconShape: String = "original",
     val launchLog: List<Pair<String, Long>> = emptyList(),
     val note: String = "",
     val surface: String = "glass",
-    val iconSize: Int = 54,
+    val iconSize: Int = 44,
     val showLabels: Boolean = true,
     val clockWeight: String = "thin",
     val clockFont: String = "default",
@@ -37,9 +37,9 @@ data class NovaPrefs(
     val homeMode: String = "nova",
     val classicPages: List<List<String>> = emptyList(),
     val classicUnplaced: List<String> = emptyList(),
-    val gridPreset: String = "5x6",
+    val gridPreset: String = "4x6",
     val dockStyle: String = "floating",
-    val iconFinish: String = "glass",
+    val iconFinish: String = "plain",
     val tasks: List<Task> = emptyList(),
     val focusLog: List<Long> = emptyList(),
     val aiKey: String = "", // legacy Claude key field; NOVA Intelligence no longer reads or sends it
@@ -49,12 +49,12 @@ data class NovaPrefs(
     val wallpaperRev: Long = 0L,
     val weather: String = "",
     val homeWeather: Boolean = true,
-    val homeStats: Boolean = false,
+    val homeStats: Boolean = true,
     val homeUpcoming: Boolean = true,
-    val homeMusic: Boolean = false,
+    val homeMusic: Boolean = true,
     val homeFrequent: Boolean = true,
-    val homeNote: Boolean = true,
-    val homeOrder: String = "frequent,upcoming,stats,music,note",
+    val homeNote: Boolean = false,
+    val homeOrder: String = "stats,upcoming,music,frequent,note",
     val frequentPos: String = "bottom"
 )
 
@@ -81,11 +81,11 @@ class SettingsStore(private val context: Context) {
             use24h = p[use24hKey] ?: true,
             dock = p[dockKey]?.split(",")?.filter { it.isNotBlank() },
             wallpaper = p[wallpaperKey] ?: "aurora",
-            iconShape = p[iconShapeKey] ?: "squircle",
+            iconShape = p[iconShapeKey] ?: "original",
             launchLog = parseLog(p[logKey]),
             note = p[noteKey] ?: "",
             surface = p[surfaceKey] ?: "glass",
-            iconSize = p[iconSizeKey] ?: 54,
+            iconSize = p[iconSizeKey] ?: 44,
             showLabels = p[showLabelsKey] ?: true,
             clockWeight = p[clockWeightKey] ?: "thin",
             clockFont = p[clockFontKey] ?: "default",
@@ -102,9 +102,9 @@ class SettingsStore(private val context: Context) {
             homeMode = p[stringPreferencesKey("home_mode")] ?: "nova",
             classicPages = decodePages(p[stringPreferencesKey("classic_pages")]),
             classicUnplaced = (p[stringPreferencesKey("classic_unplaced")] ?: "").split(",").filter { it.isNotBlank() },
-            gridPreset = p[stringPreferencesKey("grid_preset")] ?: "5x6",
+            gridPreset = p[stringPreferencesKey("grid_preset")] ?: "4x6",
             dockStyle = p[stringPreferencesKey("dock_style")] ?: "floating",
-            iconFinish = p[stringPreferencesKey("icon_finish")] ?: "glass",
+            iconFinish = p[stringPreferencesKey("icon_finish")] ?: "plain",
             tasks = decodeTasks(p[stringPreferencesKey("tasks")]),
             focusLog = (p[stringPreferencesKey("focus_log")] ?: "").split(",").mapNotNull { it.toLongOrNull() },
             aiKey = "",
@@ -114,12 +114,12 @@ class SettingsStore(private val context: Context) {
             wallpaperRev = p[stringPreferencesKey("wallpaper_rev")]?.toLongOrNull() ?: 0L,
             weather = p[stringPreferencesKey("weather")] ?: "",
             homeWeather = p[booleanPreferencesKey("w_weather")] ?: true,
-            homeStats = p[booleanPreferencesKey("w_stats")] ?: false,
+            homeStats = p[booleanPreferencesKey("w_stats")] ?: true,
             homeUpcoming = p[booleanPreferencesKey("w_upcoming")] ?: true,
-            homeMusic = p[booleanPreferencesKey("w_music")] ?: false,
+            homeMusic = p[booleanPreferencesKey("w_music")] ?: true,
             homeFrequent = p[booleanPreferencesKey("w_frequent")] ?: true,
-            homeNote = p[booleanPreferencesKey("w_note")] ?: true,
-            homeOrder = p[stringPreferencesKey("home_order")] ?: "frequent,upcoming,stats,music,note",
+            homeNote = p[booleanPreferencesKey("w_note")] ?: false,
+            homeOrder = p[stringPreferencesKey("home_order")] ?: "stats,upcoming,music,frequent,note",
             frequentPos = p[stringPreferencesKey("frequent_pos")] ?: "bottom"
         )
     }
@@ -171,14 +171,29 @@ class SettingsStore(private val context: Context) {
     }
 
     /**
-     * Restore the agreed five-column / six-row classic layout.
-     * Version 2 deliberately supersedes the earlier migration, which could already
-     * have been marked complete while a four-column preset remained saved.
+     * One-time restoration of the original NOVA visual identity.
+     * Keep the original four-column / six-row pages, native app artwork and
+     * four-icon dock. Existing dock entries are retained and completed from
+     * the original defaults rather than replacing the user's current choices.
      */
-    suspend fun restoreFiveColumnClassicGrid() = context.novaStore.edit { prefs ->
-        val migrated = booleanPreferencesKey("classic_five_column_restored_v2")
+    suspend fun restoreOriginalVisuals(defaultDock: List<String>) = context.novaStore.edit { prefs ->
+        val migrated = booleanPreferencesKey("original_visuals_restored_v1")
         if (prefs[migrated] != true) {
-            prefs[stringPreferencesKey("grid_preset")] = "5x6"
+            prefs[stringPreferencesKey("grid_preset")] = "4x6"
+            prefs[stringPreferencesKey("home_mode")] = "classic"
+            prefs[iconShapeKey] = "original"
+            prefs[stringPreferencesKey("icon_finish")] = "plain"
+            prefs[iconSizeKey] = 44
+            prefs[booleanPreferencesKey("w_stats")] = true
+            prefs[booleanPreferencesKey("w_music")] = true
+            prefs[booleanPreferencesKey("w_note")] = false
+            prefs[stringPreferencesKey("home_order")] = "stats,upcoming,music,frequent,note"
+
+            val existing = prefs[dockKey]?.split(",")?.filter { it.isNotBlank() }.orEmpty()
+            val restoredDock = (existing + defaultDock.filterNot { it in existing }).take(4)
+            if (restoredDock.size >= 4) prefs[dockKey] = restoredDock.joinToString(",")
+            else if (existing.isEmpty()) prefs[dockKey] = defaultDock.take(4).joinToString(",")
+
             prefs[migrated] = true
         }
     }

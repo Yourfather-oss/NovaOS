@@ -141,17 +141,17 @@ fun ClassicHome(
                 val pageIdx = index - 1
                 val pagePkgs = layout.pages.getOrNull(pageIdx).orEmpty()
                 BoxWithConstraints(Modifier.fillMaxSize()) {
-                    // Compact app field: preserve all five columns while keeping
-                    // the app grid within roughly 78% of the available page height.
-                    val rowGap = 8.dp
+                    // Original four-column NOVA page: keep icon cells compact, but
+                    // distribute the rows through the upper 78% of the page so the
+                    // grid has the airy alignment shown in the original screenshots.
                     val availableGridHeight = maxHeight * 0.78f
                     val compactCellHeight = minOf(
-                        (availableGridHeight - rowGap * (grid.rows - 1)) / grid.rows,
-                        (prefs.iconSize + if (prefs.showLabels) 28 else 12).coerceIn(68, 92).dp
-                    ).coerceAtLeast(64.dp)
+                        (prefs.iconSize + if (prefs.showLabels) 20 else 8).coerceIn(64, 84).dp,
+                        (availableGridHeight / grid.rows).coerceAtLeast(64.dp)
+                    )
                     Column(
-                        Modifier.fillMaxWidth().height(compactCellHeight * grid.rows + rowGap * (grid.rows - 1)),
-                        verticalArrangement = Arrangement.spacedBy(rowGap)
+                        Modifier.fillMaxWidth().height(availableGridHeight),
+                        verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         for (r in 0 until grid.rows) {
                             Row(Modifier.fillMaxWidth().height(compactCellHeight)) {
@@ -281,7 +281,7 @@ private fun ClassicCell(
             if (prefs.showLabels) {
                 Spacer(Modifier.height(5.dp))
                 Text(
-                    app.label, color = TextPrimary, fontSize = 11.sp,
+                    app.label, color = TextPrimary, fontSize = 10.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center
                 )
             }
